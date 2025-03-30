@@ -13,6 +13,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Log;
+use App\Filament\Widgets\CalendarWidget;
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
@@ -114,6 +115,12 @@ class UserResource extends Resource
             //
         ];
     }
+    // public static function getWidgets(): array
+    // {
+    //     return [
+    //         CalendarWidget::class,
+    //     ];
+    // }
 
     public static function getPages(): array
     {
@@ -122,5 +129,25 @@ class UserResource extends Resource
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+    // 判斷是否為醫生
+    public function isDoctor()
+    {
+        return $this->role === 'doctor';
+    }
+    // 判斷是否為患者
+    public function isPatient()
+    {
+        return $this->role === 'patient';
+    }
+    // 判斷是否為櫃檯人員
+    public function isReceptionist()
+    {
+        return $this->role === 'receptionist';
+    }
+    // 判斷是否為系統管理員
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
     }
 }
