@@ -8,7 +8,6 @@ use Filament\Forms;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Log;
 
 
 class CalendarWidget extends FullCalendarWidget
@@ -22,19 +21,11 @@ class CalendarWidget extends FullCalendarWidget
     // 完整型別宣告
     public Model | string | null $model = Event::class;
 
-    public function mount(): void
-    {
-        // 或
-        Log::info('Widget mounted');
-    }
-
     /**
-     * 根據用戶角色獲取事件
+     * 根據用戶角色獲取事件，最外層日歷
      */
     public function fetchEvents(array $fetchInfo): array
     {
-        Log::info('fetchEvents 被調用', $fetchInfo);
-        // dd('fetchEvents 被調用');
         $user = Auth::user();
 
         // 如果沒有登入用戶，返回空陣列
@@ -45,22 +36,6 @@ class CalendarWidget extends FullCalendarWidget
         $query = Event::query()
             ->where('starts_at', '>=', $fetchInfo['start'])
             ->where('ends_at', '<=', $fetchInfo['end']);
-
-        // 如果是醫生，只顯示自己創建的時段
-        // if ($user->role === 'doctor') {
-        //     $query->where('doctor_id', $user->id);
-        // }
-
-        // 如果是病患，顯示所有事件但不同狀態用不同顏色表示
-        // if ($user->role === 'patient') {
-        //     // 不對查詢添加條件，顯示所有時段
-        //     // 或者，只過濾出特定時段，例如：
-        //     $query->where(function ($q) use ($user) {
-        //         $q->where('status', 'available')  // 可預約時段
-        //           ->orWhere('patient_id', $user->id)  // 自己的預約
-        //           ->orWhere('status', 'booked');  // 已被他人預約的時段
-        //     });
-        // }
 
         $events = $query->get();
 
@@ -76,18 +51,20 @@ class CalendarWidget extends FullCalendarWidget
             // 只有可預約的時段才可選
             $selectable = $event->status === Event::STATUS_AVAILABLE;
 
-            $selectable = true;
             // 自定義顯示和行為
             if ($user->role === Event::ROLE['DOCTOR'] && $event->status === Event::STATUS_BOOKED) {
-                $title = "預約：" . ($event->patient ? $event->patient->name : '未知病患') . " - {$event->title}";
+                $title = "已被預約：" . ($event->patient ? $event->patient->name : '未知病患') . " - {$event->title}";
             } elseif ($user->role === Event::ROLE['PATIENT']) {
                 if ($event->status === Event::STATUS_AVAILABLE) {
                     $title = "可預約：" . ($event->doctor ? $event->doctor->name : '未知醫生') . " - {$event->title}";
                 } elseif ($event->status === Event::STATUS_BOOKED && $event->patient_id === $user->id) {
                     $title = "我的預約：" . $event->title;
                 } elseif ($event->status === Event::STATUS_BOOKED) {
+                    $backgroundColor = '#2196F3'; // 藍色：已預約
                     $title = "已被預約：" . $event->title;
-                    // $selectable = false;  // 明確設置為不可選
+                    if ($event->patient_id !== $user->id) {
+                        $selectable = false;  // 明確設置為不可選
+                    }
                 }
             }
 
@@ -118,7 +95,6 @@ class CalendarWidget extends FullCalendarWidget
         if (!isset($event->status)) {
             return '#9E9E9E'; // 默認灰色
         }
-
         if ($event->status === 'available') {
             return '#4CAF50'; // 綠色：可預約
         } elseif ($event->status === 'booked') {
@@ -133,28 +109,37 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
+     * 預約表單
      * 根據用戶角色設定不同的表單
      */
     public function getFormSchema(): array
     {
         $user = Auth::user();
-
         // 醫生表單：創建可預約時段
-        if ($user->role === 'doctor') {
+        if ($user->role === Event::ROLE['DOCTOR']) {
             return [
                 Forms\Components\TextInput::make('title')
                     ->label('診療名稱')
+                    ->disabled(function ($record) {
+                        return $record?->status === 'booked';
+                    })
                     ->required(),
 
                 Forms\Components\Grid::make()
                     ->schema([
                         Forms\Components\DateTimePicker::make('starts_at')
                             ->label('開始時間')
-                            ->required(),
+                            ->required()
+                            ->disabled(function ($record) {
+                                return $record?->status === 'booked';
+                            }),
 
                         Forms\Components\DateTimePicker::make('ends_at')
                             ->label('結束時間')
-                            ->required(),
+                            ->required()
+                            ->disabled(function ($record) {
+                                return $record?->status === 'booked';
+                            }),
                     ]),
 
                 Forms\Components\Select::make('appointment_type')
@@ -164,14 +149,26 @@ class CalendarWidget extends FullCalendarWidget
                         'specialist' => '專科診療',
                         'emergency' => '緊急診療',
                     ])
+                    ->default(function ($record) {
+                        return $record?->appointment_type;
+                    })
+                    ->disabled(function ($record) {
+                        // 如果是編輯現有記錄，則禁用
+                        return $record?->status === 'booked';
+                    })
                     ->required(),
 
                 Forms\Components\TextInput::make('location')
                     ->label('診間')
+                    ->default(function ($record) {
+                        return $record?->location;
+                    })
+                    ->disabled(function ($record) {
+                        return $record?->status === 'booked';
+                    })
                     ->required(),
 
-                // Forms\Components\Textarea::make('description')
-                //     ->label('說明'),
+
 
                 Forms\Components\Hidden::make('doctor_id')
                     ->default($user->id),
@@ -180,7 +177,6 @@ class CalendarWidget extends FullCalendarWidget
                     ->default('available'),
             ];
         }
-
         // 病患表單：預約時段
         if ($user->role === Event::ROLE['PATIENT']) {
             return [
@@ -226,79 +222,47 @@ class CalendarWidget extends FullCalendarWidget
                 Forms\Components\Textarea::make('patient_notes')
                     ->label('症狀描述')
                     ->visible(fn($record) => $record !== null)
-                    ->required(),
-                Forms\Components\Placeholder::make('status')
-                ->label('預約狀態')
-                ->content(function ($record) {
-                    if (!$record) {
-                        return '未指定狀態';
-                    }
-                    return $record->status;
-                })
-                ->default('booked'),
+                    ->required()
+                    ->disabled(function ($record) {
+                        return $record?->status === 'booked';
+                    }),
 
+                Forms\Components\Hidden::make('status')
+                    ->default('booked'),
+                // 假設有預約過了顯示預約病患
+                Forms\Components\Placeholder::make('patient_name')
+                    ->label('預約病患')
+                    ->content(function ($record) {
+                        return $record?->patient?->name;
+                    }),
+
+                // 隱藏欄位 - 直接使用當前用戶 ID 和預設狀態
                 Forms\Components\Hidden::make('patient_id')
                     ->default($user->id),
-
-
             ];
         }
-
         return [];
     }
-
-    /**
-     * 處理更新事件
-     */
-    protected function handleEventClick(array $data): void
-    {
-        Log::info('handleEventClick 被調用', $data);
-        $user = Auth::user();
-        $event = Event::find($data['id']);
-
-        if (!$event) {
-            return;
-        }
-
-        if ($user->role === Event::ROLE['PATIENT']) {
-            $event->update([
-                'patient_id' => $user->id,
-                'status' => 'booked',
-                'patient_notes' => $data['patient_notes'] ?? null,
-            ]);
-
-            Notification::make()
-                ->title('預約成功')
-                ->success()
-                ->send();
-        }
-    }
-
     /**
      * 自定義日曆配置
      */
     public function config(): array
     {
-        $user = Auth::user();
         return [
-             // ... 其他設定
-        'eventClick' => 'function(info) { console.log("Event clicked:", info); }',
-            // 'firstDay' => 1,
-            // 'headerToolbar' => [
-            //     'left' => 'dayGridMonth,timeGridWeek,timeGridDay',
-            //     'center' => 'title',
-            //     'right' => 'prev,next today',
-            // ],
-            // 'slotDuration' => '00:15:00', // 15分鐘一個時段
-            // 'slotMinTime' => '08:00:00',  // 診所開始時間
-            // 'slotMaxTime' => '18:00:00',  // 診所結束時間
-            // 'height' => '700px',
-            // 'selectable' => $user->role === 'doctor', // 只有醫生可以選擇時段創建預約
-            // 'editable' => $user->role === 'doctor',   // 只有醫生可以拖動和調整時段
+            'selectable' => false,
+            'dateClick' => false,
+            'initialView' => 'dayGridMonth',
+            'headerToolbar' => [
+                'left' => 'dayGridMonth,timeGridWeek,timeGridDay',
+                'center' => 'title',
+                'right' => 'prev,next today',
+            ],
 
         ];
     }
-
+    /**
+     * 自定義頁面頭部按鈕
+     */
     protected function headerActions(): array
     {
         $user = Auth::user();
@@ -310,8 +274,83 @@ class CalendarWidget extends FullCalendarWidget
         if ($user && $user->role === Event::ROLE['PATIENT']) {
             return [];
         }
-
         // 如果用戶是醫生，則顯示默認的創建按鈕
-        return parent::headerActions();
+        return parent::headerActions();  // 這會返回包含創建按鈕的數組
+    }
+
+    /**
+     * TODO: 這裡我希望不讓任何人去點擊日期更擊，現在寫法還是會打update事件，但不做任何反應
+     * 完全覆蓋 onDateSelect 方法，使其不執行任何操作
+     */
+    public function onDateSelect($date, $endDate = null, $allDay = false, $view = [], $resource = null): void
+    {
+        $user = Auth::user();
+        if ($user->role === Event::ROLE['DOCTOR']) {
+            Notification::make()
+                ->title('提示')
+                ->body('請使用右上角的新增按鈕來創建預約時段')
+                ->info()
+                ->send();
+        }
+        // 不執行任何操作，直接返回
+        return;
+        // 可選：顯示通知告知用戶
+
+    }
+
+    /**
+     * 編輯事件的後端邏輯，這裡透過自訂義去確保寫進資料庫資料有預設值
+     */
+    protected function modalActions(): array
+    {
+        $user = Auth::user();
+        // 判斷條件：是否為該用戶的預約
+        $isOwnAppointment = isset($this->record) && $this->record->patient_id === $user->id;
+
+        // 判斷條件：是否為已預約狀態
+        $isBooked = isset($this->record) && $this->record->status === 'booked';
+        if ($user->role === Event::ROLE['PATIENT']) {
+
+
+            return [
+                \Saade\FilamentFullCalendar\Actions\EditAction::make()
+                    ->using(function (array $data, $record) use ($user): bool {
+                        // 確保預設值
+                        $data['status'] = 'booked';
+                        $data['patient_id'] = $user->id;
+
+                        // 更新記錄
+                        return $record->update([
+                            'patient_notes' => $data['patient_notes'],
+                            'status' => $data['status'],
+                            'patient_id' => $data['patient_id'],
+                        ]);
+                    })
+                    ->hidden($isBooked && !$isOwnAppointment),
+                \Saade\FilamentFullCalendar\Actions\DeleteAction::make()
+                    // 只有當是用戶自己的預約且不是已預約狀態時才啟用
+                    ->hidden($isBooked && !$isOwnAppointment)
+                    ->using(function ($record) {
+                        // 刪除邏輯...
+                        return $record->delete();
+                    }),
+            ];
+        }
+
+        if ($user->role === Event::ROLE['DOCTOR']) {
+            return [
+                \Saade\FilamentFullCalendar\Actions\EditAction::make()
+                    ->hidden($isBooked),
+
+                \Saade\FilamentFullCalendar\Actions\DeleteAction::make()
+                    ->hidden($isBooked && !$isOwnAppointment)
+                    ->using(function ($record) {
+                        // 刪除邏輯...
+                        return $record->delete();
+                    }),
+            ];
+        }
+        // 其他情況使用默認行為
+        return parent::modalActions();
     }
 }

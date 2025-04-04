@@ -34,6 +34,7 @@ class Event extends Model
         'patient_notes',
         'doctor_notes',
         'type',
+        'location',
     ];
     protected $casts = [
         'starts_at' => 'datetime',
