@@ -24,7 +24,8 @@ class EventResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('title')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->regex('/^[a-zA-Z0-9\s]+$/'),
                 Forms\Components\DateTimePicker::make('starts_at')
                     ->required(),
                 Forms\Components\DateTimePicker::make('ends_at')
