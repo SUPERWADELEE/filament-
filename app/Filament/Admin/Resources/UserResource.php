@@ -9,7 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Log;
+
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
@@ -37,11 +37,7 @@ class UserResource extends Resource
                         'receptionist' => '櫃檯人員',
                         'admin' => '系統管理員',
                     ])
-                    ->required()
-                    ->afterStateUpdated(function ($state) {
-                        // 添加這一行來檢查狀態更新
-                        \Log::info('Role updated to: ' . $state);
-                    }),
+                    ->required(),
                 Forms\Components\TextInput::make('password')
                     ->password()
                     ->required()
@@ -105,19 +101,12 @@ class UserResource extends Resource
                 ]),
             ]);
     }
-
     public static function getRelations(): array
     {
         return [
             //
         ];
     }
-    // public static function getWidgets(): array
-    // {
-    //     return [
-    //         CalendarWidget::class,
-    //     ];
-    // }
 
     public static function getPages(): array
     {
@@ -126,25 +115,5 @@ class UserResource extends Resource
             'create' => Pages\CreateUser::route('/create'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
-    }
-    // 判斷是否為醫生
-    public function isDoctor()
-    {
-        return $this->role === 'doctor';
-    }
-    // 判斷是否為患者
-    public function isPatient()
-    {
-        return $this->role === 'patient';
-    }
-    // 判斷是否為櫃檯人員
-    public function isReceptionist()
-    {
-        return $this->role === 'receptionist';
-    }
-    // 判斷是否為系統管理員
-    public function isAdmin()
-    {
-        return $this->role === 'admin';
     }
 }
