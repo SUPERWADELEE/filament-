@@ -23,43 +23,20 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        // 確定用戶角色
-        $userRole = auth()->check() ? auth()->user()->role : null;
 
-        // 根據角色準備資源陣列
-        $resources = [];
-        if ($userRole === 'doctor') {
-            $resources = [
-                \App\Filament\Admin\Resources\EventResource::class,
-                // 其他醫生可見的資源...
-            ];
-        } elseif ($userRole === 'patient') {
-            $resources = [
-                // 病患可見的資源...
-            ];
-        }
-
-        // 準備頁面陣列
-        $pages = [\Filament\Pages\Dashboard::class];
-        if ($userRole === 'doctor') {
-            $pages[] = \App\Filament\Admin\Pages\Calendar::class;
-            // 或 \App\Filament\Pages\DoctorSchedule::class
-        } elseif ($userRole === 'patient') {
-            $pages[] = \App\Filament\Pages\PatientAppointment::class;
-        }
-
+        $pages = [\App\Filament\Admin\Pages\Calendar::class];
         return $panel
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
             ->registration(Register::class)
+            ->brandName('醫療預約系統')
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => Color::Red,
             ])
             ->authGuard('web')
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\\Filament\\Admin\\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\\Filament\\Admin\\Pages')
-
             ->plugin(
                 FilamentFullCalendarPlugin::make()
                     ->selectable(true)
@@ -67,8 +44,6 @@ class AdminPanelProvider extends PanelProvider
                     ->timezone('Asia/Taipei')
                     ->locale('zh-tw')
             )
-            ->resources($resources)
-            ->pages($pages)
             ->widgets([
                 CalendarWidget::class,
             ])

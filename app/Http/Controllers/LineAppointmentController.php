@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class LineAppointmentController extends Controller
@@ -115,6 +116,73 @@ class LineAppointmentController extends Controller
         return response()->json([
             'success' => true,
             'user' => $user
+        ]);
+    }
+    /**
+     * 顯示預約歷史頁面
+     */
+    public function getHistoryPage(Request $request)
+    {
+        // 調試日誌
+        Log::info('進入 getHistoryPage 方法');
+        Log::info('用戶登入狀態: ' . (Auth::check() ? '已登入' : '未登入'));
+
+        // 檢查用戶是否已登入
+        if (!Auth::check()) {
+            Log::info('用戶未登入，顯示登入提示');
+            // 未登入，可以重定向到登入頁面或顯示提示訊息
+            return view('line.appointmentHistory', [
+                'events' => [],
+                'needLogin' => true
+            ]);
+        }
+
+        $user = Auth::user();
+        Log::info('用戶已登入, ID: ' . $user->id . ', 名稱: ' . $user->name);
+
+        // 返回當前用戶已預約過的事件
+        $bookedEvents = Event::where('status', 'booked')
+            ->where('patient_id', $user->id)
+            ->with('doctor')
+            ->get();
+
+        Log::info('找到 ' . $bookedEvents->count() . ' 個預約');
+
+        return view('line.appointmentHistory', [
+            'events' => $bookedEvents,
+            'needLogin' => false
+        ]);
+    }
+
+    /**
+     * 獲取用戶預約歷史
+     */
+    public function fetchHistory(Request $request)
+    {
+        $validated = $request->validate([
+            'line_user_id' => 'required|string',
+        ]);
+
+        // 查找用戶
+        $user = User::where('line_user_id', $validated['line_user_id'])->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => '找不到用戶資料'
+            ]);
+        }
+
+        // 獲取用戶的預約歷史
+        $appointments = Event::where('patient_id', $user->id)
+            ->where('status', 'booked')
+            ->with('doctor')
+            ->orderBy('starts_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'appointments' => $appointments
         ]);
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class LineLoginController extends Controller
 {
@@ -39,7 +40,10 @@ class LineLoginController extends Controller
                 $tempLineUserId = session('temp_line_user_id');
 
                 // 檢查現有用戶是否已存在email
-                $existingUser = User::where('email', $lineUser->getEmail())->first();
+                $existingUser = null;
+                if ($lineUser->getEmail()) {
+                    $existingUser = User::where('email', $lineUser->getEmail())->first();
+                }
 
                 if ($existingUser) {
                     // 更新現有用戶的LINE ID
@@ -61,9 +65,16 @@ class LineLoginController extends Controller
             // 登入用戶
             Auth::login($user);
 
-            // 重定向回預約頁面並帶上用戶ID
-            return redirect()->route('line.appointment', [
-                'line_user_id' => $lineUserId
+            // 檢查是否需要重定向到預約歷史頁面
+            $isFromHistory = $request->cookie('line_from_history') === 'true';
+            $redirectUrl = $isFromHistory
+                ? route('line.appointment.history')
+                : route('line.appointment');
+            // 重定向到正確的頁面，添加一個包含JavaScript的視圖
+            return view('line.redirect_handler', [
+                'lineUserId' => $lineUserId,
+                'appointment_url' => route('line.appointment', ['line_user_id' => $lineUserId]),
+                'history_url' => route('line.appointment.history', ['line_user_id' => $lineUserId])
             ]);
         } catch (\Exception $e) {
             return redirect()->route('line.appointment')

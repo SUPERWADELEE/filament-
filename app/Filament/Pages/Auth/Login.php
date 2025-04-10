@@ -9,6 +9,16 @@ use Filament\Notifications\Notification;
 
 class Login extends BaseLogin
 {
+    public function getTitle(): string
+    {
+        return '登入';
+    }
+
+    public function getHeading(): string
+    {
+        return '登入';
+    }
+
     public function authenticate(): ?LoginResponse
     {
         // 1. 獲取表單數據
