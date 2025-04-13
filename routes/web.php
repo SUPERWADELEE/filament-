@@ -2,10 +2,23 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
-
+use Illuminate\Support\Facades\Auth;
 Route::get('/', function () {
     return view('welcome');
 });
+Route::get('/check-auth', function () {
+    if (Auth::check()) {
+        return [
+            'login' => true,
+            'user' => Auth::user(),
+        ];
+    } else {
+        return [
+            'login' => false,
+        ];
+    }
+});
+
 
 // 添加電子郵件路由
 Route::get('/email/verify/{id}/{token}', function ($id, $token) {
