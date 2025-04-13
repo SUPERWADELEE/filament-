@@ -21,3 +21,12 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+/public/css
+/public/js
+/public/images
+/public/fonts
+/public/videos
+/public/audio
+/public/images
+resources/views/vendor
