@@ -43,32 +43,20 @@ class LineAppointmentController extends Controller
             'line_user_id' => 'nullable|string' // 改為可選
         ]);
 
-        // 檢查是否有用戶登入
-        if (!Auth::check()) {
-            // 嘗試通過姓名查找用戶
-            $user = User::where('line_user_id', $validated['line_user_id'])->first();
+        // 嘗試通過姓名查找用戶
+        $user = User::where('line_user_id', $validated['line_user_id'])->first();
 
-            // 如果找不到用戶但有LINE ID，嘗試通過LINE ID查找
-            if (!$user && !empty($validated['line_user_id'])) {
-                $user = User::where('line_user_id', $validated['line_user_id'])->first();
-            }
-
-            // 如果還是找不到用戶，創建一個新用戶
-            if (!$user) {
-                $user = User::create([
-                    'name' => $validated['patient_name'],
-                    'email' => ($validated['line_user_id'] ?? Str::random(10)) . '@patient.local',
-                    'password' => bcrypt(Str::random(16)),
-                    'line_user_id' => $validated['line_user_id'] ?? null,
-                    'role' => 'patient',
-                ]);
-            }
-
-            // 登入找到或創建的用戶
-            Auth::login($user);
-        } else {
-            $user = Auth::user();
+        // 如果還是找不到用戶，創建一個新用戶
+        if (!$user) {
+            $user = User::create([
+                'name' => $validated['patient_name'],
+                'email' => ($validated['line_user_id'] ?? Str::random(10)) . '@patient.local',
+                'password' => bcrypt(Str::random(16)),
+                'line_user_id' => $validated['line_user_id'] ?? null,
+                'role' => 'patient',
+            ]);
         }
+
 
         // 檢查事件是否可用
         $event = Event::findOrFail($validated['event_id']);
@@ -121,35 +109,34 @@ class LineAppointmentController extends Controller
     /**
      * 顯示預約歷史頁面
      */
+    // 控制器
     public function getHistoryPage(Request $request)
     {
-        // 調試日誌
-        Log::info('進入 getHistoryPage 方法');
-        Log::info('用戶登入狀態: ' . (Auth::check() ? '已登入' : '未登入'));
+        // 獲取用戶
+        $user = Auth::user() ?? User::where('line_user_id', $request->input('line_user_id'))->first();
 
-        // 檢查用戶是否已登入
-        if (!Auth::check()) {
-            Log::info('用戶未登入，顯示登入提示');
-            // 未登入，可以重定向到登入頁面或顯示提示訊息
-            return view('line.appointmentHistory', [
-                'events' => [],
-                'needLogin' => true
-            ]);
+        if (!$user) {
+            return view('line.appointmentHistory', ['needLogin' => true]);
         }
 
-        $user = Auth::user();
-        Log::info('用戶已登入, ID: ' . $user->id . ', 名稱: ' . $user->name);
-
-        // 返回當前用戶已預約過的事件
-        $bookedEvents = Event::where('status', 'booked')
-            ->where('patient_id', $user->id)
+        // 獲取預約並分類
+        $now = now();
+        $appointments = Event::where('patient_id', $user->id)
+            ->where('status', 'booked')
             ->with('doctor')
             ->get();
 
-        Log::info('找到 ' . $bookedEvents->count() . ' 個預約');
+        $upcomingAppointments = $appointments->filter(function ($appointment) use ($now) {
+            return $appointment->starts_at >= $now;
+        })->sortBy('starts_at');
+
+        $pastAppointments = $appointments->filter(function ($appointment) use ($now) {
+            return $appointment->starts_at < $now;
+        })->sortByDesc('starts_at');
 
         return view('line.appointmentHistory', [
-            'events' => $bookedEvents,
+            'upcomingAppointments' => $upcomingAppointments,
+            'pastAppointments' => $pastAppointments,
             'needLogin' => false
         ]);
     }
@@ -163,7 +150,7 @@ class LineAppointmentController extends Controller
             'line_user_id' => 'required|string',
         ]);
 
-        // 查找用戶
+        // 現在要用line_user_id去找用戶，然後再用這個用戶去找到對應的event事件
         $user = User::where('line_user_id', $validated['line_user_id'])->first();
 
         if (!$user) {
@@ -180,9 +167,10 @@ class LineAppointmentController extends Controller
             ->orderBy('starts_at', 'desc')
             ->get();
 
+
         return response()->json([
             'success' => true,
-            'appointments' => $appointments
+            'appointments' => $appointments,
         ]);
     }
 }

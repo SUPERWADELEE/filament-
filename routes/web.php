@@ -35,6 +35,13 @@ Route::prefix('line')->group(function () {
         ->name('line.appointment.book');
     Route::post('/check/user', 'App\Http\Controllers\LineAppointmentController@checkOrCreateUser')
         ->name('line.check.user');
+    // 預約歷史頁面 - 直接返回視圖
+    Route::get('appointment/history', 'App\Http\Controllers\LineAppointmentController@getHistoryPage')
+        ->name('line.appointment.history');
+    Route::post('/appointment/history/fetch', 'App\Http\Controllers\LineAppointmentController@fetchHistory')
+        ->name('line.appointment.history.fetch');
+
+        
     // 登入相關
     Route::get('/login', 'App\Http\Controllers\LineLoginController@redirectToLine')
         ->name('line.login');

@@ -22,9 +22,7 @@ use App\Filament\Pages\Auth\Login;
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
-    {
-
-        $pages = [\App\Filament\Admin\Pages\Calendar::class];
+    {;
         return $panel
             ->id('admin')
             ->path('admin')

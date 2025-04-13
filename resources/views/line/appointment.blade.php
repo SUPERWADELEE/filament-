@@ -72,6 +72,11 @@
             </div>
             <h1 class="text-3xl font-bold text-gray-800 mb-2">線上診療預約</h1>
             <p class="text-gray-600">請填寫以下資料完成您的診療預約</p>
+            <div class="mt-3">
+                <a href="{{ route('line.appointment.history') }}" class="text-blue-500 hover:text-blue-700">
+                    <i class="fas fa-history mr-1"></i>查看預約歷史
+                </a>
+            </div>
         </div>
 
         <div id="loginMessage" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg mb-6 hidden">
@@ -179,7 +184,7 @@
         <!-- 底部資訊 -->
         <div class="mt-8 text-center text-gray-500 text-sm">
             <p>若有任何問題，請聯繫我們的客服</p>
-            <p class="mt-1">&copy; 2023 醫療預約系統</p>
+            <p class="mt-1">&copy; 2025 醫療預約系統</p>
         </div>
     </div>
 
@@ -198,42 +203,20 @@
             document.getElementById('bookingForm').classList.remove('hidden');
         });
 
+        // 初始化line_user_id
+        let lineUserId = null;
+
         // 初始化 LIFF
         async function initializeLiff() {
-            // 創建一個調試區域
-            const debugArea = document.createElement('div');
-            debugArea.style.position = 'fixed';
-            debugArea.style.bottom = '0';
-            debugArea.style.right = '0';
-            debugArea.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            debugArea.style.color = 'white';
-            debugArea.style.padding = '10px';
-            debugArea.style.fontSize = '12px';
-            debugArea.style.maxHeight = '150px';
-            debugArea.style.overflow = 'auto';
-            debugArea.style.zIndex = '9999';
-            document.body.appendChild(debugArea);
-
-            function debug(message) {
-                console.log(message);
-                const line = document.createElement('div');
-                line.textContent = message;
-                debugArea.appendChild(line);
-                debugArea.scrollTop = debugArea.scrollHeight;
-            }
-
-            debug("初始化LIFF...");
             try {
                 await liff.init({
                     liffId: "2007210862-ZL3R8Jy4"
                 });
-                debug("LIFF初始化成功");
 
                 if (liff.isLoggedIn()) {
                     // 只是獲取LINE資料的前提條件
                     const profile = await liff.getProfile();
-                    const lineUserId = profile.userId;
-                    debug("LINE ID:", lineUserId);
+                    lineUserId = profile.userId;
 
                     // 真正重要的是：檢查該LINE ID是否有對應的Laravel帳號
                     await checkOrCreateUser(profile.userId, profile.displayName);
@@ -242,7 +225,6 @@
                     liff.login();
                 }
             } catch (error) {
-                debug('LIFF初始化失敗: ' + error.message);
                 showNotification('無法初始化LINE服務，請稍後再試', 'error');
             }
         }
@@ -272,11 +254,10 @@
         }
         // 初始化表單
         async function initializeForm() {
-            console.log("初始化表單...");
             try {
                 // 獲取所有事件
                 const events = @json($events ?? []);
-                console.log("獲取到事件數量:", events.length);
+
 
                 if (!events || events.length === 0) {
                     showNotification('目前沒有可預約的時段', 'info');
@@ -286,7 +267,6 @@
                 // 提取唯一醫生列表
                 const doctors = [...new Map(
                     events.filter(event => {
-                        console.log("檢查事件:", event);
                         return event.doctor && event.status === 'available';
                     })
                     .map(event => [event.doctor.id, event.doctor])
@@ -309,7 +289,6 @@
 
                 // 如果沒有可用醫生，顯示提示
                 if (doctors.length === 0) {
-                    console.log("沒有可用醫生");
                     const option = document.createElement('option');
                     option.value = "";
                     option.textContent = "目前沒有可預約的醫生";
@@ -338,7 +317,6 @@
 
         // 更新時段下拉選單
         function updateTimeSlots(doctorId, events) {
-            console.log("更新時段，醫生ID:", doctorId);
             const timeSlotSelect = document.getElementById('timeSlotSelect');
 
             // 清空現有選項
@@ -357,7 +335,6 @@
                 event.status === 'available'
             );
 
-            console.log("該醫生可用時段數量:", availableSlots.length);
 
             if (availableSlots.length === 0) {
                 timeSlotSelect.appendChild(new Option('該醫生目前沒有可用時段', ''));
@@ -374,23 +351,8 @@
             availableSlots.forEach(slot => {
                 const startsAt = new Date(slot.starts_at);
                 const endsAt = new Date(slot.ends_at);
-
                 const dateStr = formatDate(startsAt);
-
-                // 如果是新的日期，添加分隔符
-                if (dateStr !== currentDate) {
-                    currentDate = dateStr;
-
-                    const groupOption = document.createElement('option');
-                    groupOption.disabled = true;
-                    groupOption.style.fontWeight = 'bold';
-                    groupOption.style.backgroundColor = '#f3f4f6';
-                    groupOption.textContent = `${dateStr} (${getDayOfWeek(startsAt)})`;
-                    timeSlotSelect.appendChild(groupOption);
-                }
-
-                const timeText = `${formatTime(startsAt)}-${formatTime(endsAt)} ${slot.title}`;
-
+                const timeText = `${formatTime(startsAt)} ~ ${formatTime(endsAt)}`;
                 const option = document.createElement('option');
                 option.value = slot.id;
                 option.textContent = timeText;
@@ -405,7 +367,6 @@
             const patientName = document.getElementById('patientName').value;
             const eventId = document.getElementById('timeSlotSelect').value;
             const patientNotes = document.getElementById('patientNotes').value;
-            const lineUserId = document.getElementById('lineUserId').value;
 
             // 表單驗證
             if (!patientName) {
@@ -519,7 +480,18 @@
 
         // 格式化時間
         function formatTime(date) {
-            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            // 修改前可能是這樣，導致了 "wa" 後綴問題
+            // return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+
+            // 改成這樣，直接使用小時和分鐘
+
+
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${year}/${month}/${day} ${hours}:${minutes}`;
         }
     </script>
 </body>
