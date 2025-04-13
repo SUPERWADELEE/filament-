@@ -35,6 +35,8 @@ class Event extends Model
         'doctor_notes',
         'type',
         'location',
+        'line_user_id',
+        'patient_name',
     ];
     protected $casts = [
         'starts_at' => 'datetime',

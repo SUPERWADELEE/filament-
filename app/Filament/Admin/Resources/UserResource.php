@@ -9,12 +9,13 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Log;
+
+
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     public static function form(Form $form): Form
     {
@@ -29,6 +30,7 @@ class UserResource extends Resource
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
                 // Forms\Components\DateTimePicker::make('email_verified_at'),
+                // TODO 這種選項，看要不要從資料庫撈
                 Forms\Components\Select::make('role')
                     ->label('角色權限')
                     ->options([
@@ -37,11 +39,7 @@ class UserResource extends Resource
                         'receptionist' => '櫃檯人員',
                         'admin' => '系統管理員',
                     ])
-                    ->required()
-                    ->afterStateUpdated(function ($state) {
-                        // 添加這一行來檢查狀態更新
-                        \Log::info('Role updated to: ' . $state);
-                    }),
+                    ->required(),
                 Forms\Components\TextInput::make('password')
                     ->password()
                     ->required()
@@ -98,6 +96,9 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\ViewAction::make(),
+
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -105,46 +106,19 @@ class UserResource extends Resource
                 ]),
             ]);
     }
-
     public static function getRelations(): array
     {
         return [
             //
         ];
     }
-    // public static function getWidgets(): array
-    // {
-    //     return [
-    //         CalendarWidget::class,
-    //     ];
-    // }
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListUsers::route('/'),
             'create' => Pages\CreateUser::route('/create'),
-            'edit' => Pages\EditUser::route('/{record}/edit'),
+            'edit' => Pages\EditUser::route('/{record}/edit')
         ];
-    }
-    // 判斷是否為醫生
-    public function isDoctor()
-    {
-        return $this->role === 'doctor';
-    }
-    // 判斷是否為患者
-    public function isPatient()
-    {
-        return $this->role === 'patient';
-    }
-    // 判斷是否為櫃檯人員
-    public function isReceptionist()
-    {
-        return $this->role === 'receptionist';
-    }
-    // 判斷是否為系統管理員
-    public function isAdmin()
-    {
-        return $this->role === 'admin';
     }
 }
