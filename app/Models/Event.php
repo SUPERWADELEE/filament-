@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class Event extends Model
 {
     use HasFactory;
-    //
 
     const STATUS_AVAILABLE = 'available';
     const STATUS_BOOKED = 'booked';
@@ -50,17 +50,5 @@ class Event extends Model
     public function patient()
     {
         return $this->belongsTo(User::class, 'patient_id');
-    }
-
-    // 檢查是否可以預約
-    public function isAvailable(): bool
-    {
-        return $this->status === 'available';
-    }
-
-    // 檢查是否已被預約
-    public function isBooked(): bool
-    {
-        return $this->status === 'booked';
     }
 }

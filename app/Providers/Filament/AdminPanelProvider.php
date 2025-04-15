@@ -31,10 +31,10 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
-            ->registration(Register::class)
+            // ->registration(Register::class)
             ->brandName('醫療預約系統')
             ->colors([
-                'primary' => Color::Red,
+                'primary' => Color::Blue,
             ])
             ->authGuard('web')
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\\Filament\\Admin\\Resources')
@@ -54,14 +54,15 @@ class AdminPanelProvider extends PanelProvider
                     ->item(
                         NavigationItem::make('用戶管理')
                             ->icon('heroicon-o-user-group')
-                            ->url(route('filament.admin.resources.users.index'))  // 修改這一行
+                            ->url(route('filament.admin.resources.users.index'))
                             // 只有管理員可以看到
-                            ->visible(fn() => Auth::user()->role === 'doctor')
+                            ->visible(fn() => Auth::user()->role === 'admin')
                     )
                     ->item(
                         NavigationItem::make('預約管理')
                             ->icon('heroicon-o-calendar')
                             ->url(route('filament.admin.pages.calendar'))
+                            ->hidden(fn() => Auth::user()->role == 'admin')
                     );
             })
             ->middleware([

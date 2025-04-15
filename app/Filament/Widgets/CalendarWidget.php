@@ -24,10 +24,40 @@ class CalendarWidget extends FullCalendarWidget
     public Model | string | null $model = Event::class;
 
     // 事件顏色常量
-    private const COLOR_BOOKED_SELF = '#2196F3';    // 藍色 - 自己的預約
-    private const COLOR_BOOKED_OTHER = '#FF0000';   // 紅色 - 已被他人預約
+    private const COLOR_BOOKED = '#FF0000';   // 紅色 - 已被他人預約
     private const COLOR_AVAILABLE = '#4CAF50';      // 綠色 - 可預約時段
 
+    // 預約類型常量
+    private const APPOINTMENT_TYPE_GENERAL = '一般診療';
+    private const APPOINTMENT_TYPE_SPECIALIST = '專科診療';
+    private const APPOINTMENT_TYPE_EMERGENCY = '緊急診療';
+
+    // 狀態常量
+    private const STATUS_BOOKED = 'booked';
+    private const STATUS_AVAILABLE = 'available';
+
+    // 標籤常量
+    private const LABEL_DOCTOR = '醫生';
+    private const LABEL_TREATMENT = '診療名稱';
+    private const LABEL_START_TIME = '開始時間';
+    private const LABEL_END_TIME = '結束時間';
+    private const LABEL_APPOINTMENT_TIME = '預約時間';
+    private const LABEL_APPOINTMENT_TYPE = '預約類型';
+    private const LABEL_LOCATION = '診間';
+    private const LABEL_PATIENT_NOTES = '症狀描述';
+    private const LABEL_PATIENT = '預約病患';
+
+    // 消息常量
+    private const MSG_USE_CREATE_BUTTON = '請使用右上角的新增按鈕來創建預約時段';
+    private const MSG_TIME_CONFLICT = '此時段已有其他預約，請選擇其他時間';
+    private const MSG_START_BEFORE_END = '開始時間必須早於結束時間';
+    private const MSG_START_DAY_AFTER = '開始時間必須至少比現在晚一天';
+
+    // 其他常量
+    private const DEBOUNCE_TIME_MS = 100;  // 防抖動時間間隔（毫秒）
+    private const NAME_REGEX = '/^[a-zA-Z0-9\s\p{Han}]+$/u';  // 名稱正則表達式
+
+    // 事件獲取與顯示相關
     /**
      * 根據用戶角色獲取日歷事件
      */
@@ -59,6 +89,57 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
+     * 獲取指定時間範圍內的事件
+     */
+    private function getEventsInRange(string $startDate, string $endDate): \Illuminate\Database\Eloquent\Collection
+    {
+        return Event::query()
+            ->where('starts_at', '>=', $startDate)
+            ->where('ends_at', '<=', $endDate)
+            ->get();
+    }
+
+    /**
+     * 根據事件狀態和用戶關係格式化事件標題
+     */
+    private function formatEventTitle(Event $event, $user): string
+    {
+        if ($event->status === Event::STATUS_BOOKED) {
+            // if ($event->patient_id === $user->id) {
+            //     return "我的預約：{$event->title}";
+            // }
+
+            $patientName = $event->patient ? $event->patient->name : '未知病患';
+            return "已被預約：{$patientName} - 診療: {$event->title}";
+        }
+
+        if ($event->status === Event::STATUS_AVAILABLE) {
+            $doctorName = $event->doctor ? $event->doctor->name : '未知醫生';
+            return "可預約, 醫生: {$doctorName} - 診療: {$event->title}";
+        }
+
+        return $event->title;
+    }
+
+    /**
+     * 獲取事件顏色
+     */
+    private function getEventColor(Event $event): string
+    {
+        if ($event->status === Event::STATUS_BOOKED) {
+            return self::COLOR_BOOKED;
+        }
+
+        if ($event->status === Event::STATUS_AVAILABLE) {
+            return self::COLOR_AVAILABLE;
+        }
+
+        return self::COLOR_AVAILABLE; // 默認顏色
+    }
+
+    // 表單結構與字段定義
+
+    /**
      * 預約表單
      * 根據用戶角色設定不同的表單,
      * TODO: 是否能從這裡去用資料庫過濾查詢資料
@@ -78,6 +159,168 @@ class CalendarWidget extends FullCalendarWidget
         return [];
     }
 
+    /**
+     * 醫生角色的表單定義
+     */
+    private function getDoctorFormSchema($user): array
+    {
+        return [
+            $this->getTitleField(),
+            $this->getDoctorNameField(),
+            $this->getDateTimeFields(),
+            $this->getAppointmentTypeField(),
+            $this->getLocationField(),
+            Forms\Components\Hidden::make('doctor_id')->default($user->id),
+            Forms\Components\Hidden::make('status')->default(self::STATUS_AVAILABLE),
+        ];
+    }
+
+    /**
+     * 病患角色的表單定義
+     */
+    private function getPatientFormSchema($user): array
+    {
+        return [
+            $this->getTitlePlaceholder(),
+            $this->getDoctorNameField(),
+            $this->getAppointmentTimePlaceholder(),
+            $this->getLocationPlaceholder(),
+            $this->getPatientNotesField(),
+            Forms\Components\Hidden::make('status')->default(self::STATUS_BOOKED),
+            Forms\Components\Placeholder::make('patient_name')
+                ->label(self::LABEL_PATIENT)
+                ->content(fn($record) => $record?->patient?->name),
+            Forms\Components\Hidden::make('patient_id')->default($user->id),
+        ];
+    }
+
+    /**
+     * 診療名稱輸入欄位
+     */
+    private function getTitleField(): Forms\Components\TextInput
+    {
+        return Forms\Components\TextInput::make('title')
+            ->label(self::LABEL_TREATMENT)
+            ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED)
+            ->maxLength(255)
+            ->regex(self::NAME_REGEX)
+            ->validationMessages([
+                'regex' => '診療名稱只能包含中英文、數字和空格',
+            ])
+            ->required();
+    }
+
+    /**
+     * 診療名稱顯示欄位
+     */
+    private function getTitlePlaceholder(): Forms\Components\Placeholder
+    {
+        return Forms\Components\Placeholder::make('title')
+            ->label(self::LABEL_TREATMENT)
+            ->content(function ($record) {
+                return $record ? $record->title : '無記錄';
+            });
+    }
+
+    /**
+     * 醫生名稱顯示欄位
+     */
+    private function getDoctorNameField(): Forms\Components\Placeholder
+    {
+        return Forms\Components\Placeholder::make('doctor_name')
+            ->label(self::LABEL_DOCTOR)
+            ->visible(fn($record) => $record && $record->doctor)
+            ->content(fn($record) => $record->doctor->name);
+    }
+
+    /**
+     * 日期時間選擇欄位
+     */
+    private function getDateTimeFields(): Forms\Components\Grid
+    {
+        return Forms\Components\Grid::make()
+            ->schema([
+                Forms\Components\DateTimePicker::make('starts_at')
+                    ->label(self::LABEL_START_TIME)
+                    ->required()
+                    ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED),
+
+                Forms\Components\DateTimePicker::make('ends_at')
+                    ->label(self::LABEL_END_TIME)
+                    ->required()
+                    ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED)
+
+            ]);
+    }
+
+    /**
+     * 預約時間顯示欄位
+     */
+    private function getAppointmentTimePlaceholder(): Forms\Components\Placeholder
+    {
+        return Forms\Components\Placeholder::make('appointment_time')
+            ->label(self::LABEL_APPOINTMENT_TIME)
+            ->content(function ($record) {
+                if (!$record) {
+                    return '未指定時間';
+                }
+                return $record->starts_at->format('Y-m-d H:i') . ' - ' .
+                    $record->ends_at->format('H:i');
+            });
+    }
+
+    /**
+     * 預約類型選擇欄位
+     */
+    private function getAppointmentTypeField(): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('appointment_type')
+            ->label(self::LABEL_APPOINTMENT_TYPE)
+            ->options([
+                'general' => self::APPOINTMENT_TYPE_GENERAL,
+                'specialist' => self::APPOINTMENT_TYPE_SPECIALIST,
+                'emergency' => self::APPOINTMENT_TYPE_EMERGENCY,
+            ])
+            ->default(fn($record) => $record?->appointment_type)
+            ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED)
+            ->required();
+    }
+
+    /**
+     * 診間輸入欄位
+     */
+    private function getLocationField(): Forms\Components\TextInput
+    {
+        return Forms\Components\TextInput::make('location')
+            ->label(self::LABEL_LOCATION)
+            ->default(fn($record) => $record?->location)
+            ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED)
+            ->required();
+    }
+
+    /**
+     * 診間顯示欄位
+     */
+    private function getLocationPlaceholder(): Forms\Components\Placeholder
+    {
+        return Forms\Components\Placeholder::make('location')
+            ->label(self::LABEL_LOCATION)
+            ->content(fn($record) => $record ? $record->location : '未指定診間');
+    }
+
+    /**
+     * 病患備註輸入欄位
+     */
+    private function getPatientNotesField(): Forms\Components\Textarea
+    {
+        return Forms\Components\Textarea::make('patient_notes')
+            ->label(self::LABEL_PATIENT_NOTES)
+            ->visible(fn($record) => $record !== null)
+            ->required()
+            ->disabled(fn($record) => $record?->status === self::STATUS_BOOKED);
+    }
+
+    // 交互動作與按鈕
     /**
      * 自定義頁面頭部創建按鈕   
      */
@@ -103,8 +346,6 @@ class CalendarWidget extends FullCalendarWidget
         ];
     }
 
-
-
     /**
      * 完全覆蓋 onDateSelect 方法，使其不執行任何操作
      */
@@ -112,13 +353,13 @@ class CalendarWidget extends FullCalendarWidget
     {
         // 這裡有發現他前端會有連續觸發，所以需要debounce
         $now = now();
-        if ($this->lastDateSelectTime && $now->diffInMilliseconds($this->lastDateSelectTime) < 100) {
+        if ($this->lastDateSelectTime && $now->diffInMilliseconds($this->lastDateSelectTime) < self::DEBOUNCE_TIME_MS) {
             return;
         }
         $this->lastDateSelectTime = $now;
         $user = Auth::user();
         if ($user->role === Event::ROLE['DOCTOR']) {
-            $this->sendSimpleNotification('提示', '請使用右上角的新增按鈕來創建預約時段');
+            $this->sendSimpleNotification('提示', self::MSG_USE_CREATE_BUTTON);
         }
         // 如果用戶是病患，則不顯示任何操作按鈕
         return;
@@ -148,14 +389,14 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * 获取病患角色的模态操作按钮
+     * 獲取病患角色的模態操作按鈕
      */
     private function getPatientModalActions($user): array
     {
         return [
             $this->createEditAction($user, function (array $data, $record) use ($user): bool {
                 // 確保預設值
-                $data['status'] = 'booked';
+                $data['status'] = self::STATUS_BOOKED;
                 $data['patient_id'] = $user->id;
 
                 // 更新記錄
@@ -170,7 +411,7 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * 获取医生角色的模态操作按钮
+     * 獲取醫生角色的模態操作按鈕
      */
     private function getDoctorModalActions($user): array
     {
@@ -181,7 +422,7 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * 创建编辑按钮
+     * 創建編輯按鈕
      */
     private function createEditAction($user, callable $callback = null): \Saade\FilamentFullCalendar\Actions\EditAction
     {
@@ -196,7 +437,7 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * 创建删除按钮
+     * 創建刪除按鈕
      */
     private function createDeleteAction($user): \Saade\FilamentFullCalendar\Actions\DeleteAction
     {
@@ -206,214 +447,23 @@ class CalendarWidget extends FullCalendarWidget
     }
 
     /**
-     * 检查记录是否已预约且不属于当前用户
+     * 檢查記錄是否已預約且不屬於當前用戶
      */
     private function isBookedOrOwnAppointment($user): bool
     {
-        $isBooked = isset($this->record) && $this->record->status === 'booked';
-        $isOwnAppointment = isset($this->record) && $this->record->patient_id === $user->id;
-        return $isBooked && !$isOwnAppointment;
+        $isBooked = isset($this->record) && $this->record->status === self::STATUS_BOOKED;
+        // $isOwnAppointment = isset($this->record) && $this->record->patient_id === $user->id;
+        return $isBooked;
     }
 
     /**
-     * 醫生角色的表單定義
+     * 檢查時間衝突
      */
-    private function getDoctorFormSchema($user): array
-    {
-        return [
-            $this->getTitleField(),
-            $this->getDoctorNameField(),
-            $this->getDateTimeFields(),
-            $this->getAppointmentTypeField(),
-            $this->getLocationField(),
-            Forms\Components\Hidden::make('doctor_id')->default($user->id),
-            Forms\Components\Hidden::make('status')->default('available'),
-        ];
-    }
-
-    /**
-     * 病患角色的表單定義
-     */
-    private function getPatientFormSchema($user): array
-    {
-        return [
-            $this->getTitlePlaceholder(),
-            $this->getDoctorNameField(),
-            $this->getAppointmentTimePlaceholder(),
-            $this->getLocationPlaceholder(),
-            $this->getPatientNotesField(),
-            Forms\Components\Hidden::make('status')->default('booked'),
-            Forms\Components\Placeholder::make('patient_name')
-                ->label('預約病患')
-                ->content(fn($record) => $record?->patient?->name),
-            Forms\Components\Hidden::make('patient_id')->default($user->id),
-        ];
-    }
-    /**
-     * 診療名稱輸入欄位
-     */
-    private function getTitleField(): Forms\Components\TextInput
-    {
-        return Forms\Components\TextInput::make('title')
-            ->label('診療名稱')
-            ->disabled(fn($record) => $record?->status === 'booked')
-            ->maxLength(255)
-            ->required();
-    }
-
-    /**
-     * 診療名稱顯示欄位
-     */
-    private function getTitlePlaceholder(): Forms\Components\Placeholder
-    {
-        return Forms\Components\Placeholder::make('title')
-            ->label('診療名稱')
-            ->content(function ($record) {
-                return $record ? $record->title : '無記錄';
-            });
-    }
-
-    /**
-     * 醫生名稱顯示欄位
-     */
-    private function getDoctorNameField(): Forms\Components\Placeholder
-    {
-        return Forms\Components\Placeholder::make('doctor_name')
-            ->label('醫生')
-            ->content(function ($record) {
-                if (!$record || !$record->doctor) {
-                    return '無醫生資訊';
-                }
-                return $record->doctor->name;
-            });
-    }
-
-    /**
-     * 日期時間選擇欄位
-     */
-    private function getDateTimeFields(): Forms\Components\Grid
-    {
-        return Forms\Components\Grid::make()
-            ->schema([
-                Forms\Components\DateTimePicker::make('starts_at')
-                    ->label('開始時間')
-                    ->required()
-                    ->disabled(fn($record) => $record?->status === 'booked')
-                    ->afterOrEqual(now()->addDay()->startOfMinute())
-                    ->validationMessages([
-                        'required' => '請選擇開始時間',
-                        'after_or_equal' => '開始時間必須大於或等於明天',
-                    ])
-                    ->reactive(),
-
-                Forms\Components\DateTimePicker::make('ends_at')
-                    ->label('結束時間')
-                    ->required()
-                    ->disabled(fn($record) => $record?->status === 'booked')
-                    ->rules(['required', 'after:starts_at'])
-                    ->afterOrEqual(fn(Forms\Get $get) => $get('starts_at') ?? now()->startOfMinute())
-                    ->validationMessages([
-                        'required' => '請選擇結束時間',
-                        'after' => '結束時間必須大於開始時間',
-                        'after_or_equal' => '結束時間不能小於開始時間',
-                    ]),
-            ]);
-    }
-
-    /**
-     * 預約時間顯示欄位
-     */
-    private function getAppointmentTimePlaceholder(): Forms\Components\Placeholder
-    {
-        return Forms\Components\Placeholder::make('appointment_time')
-            ->label('預約時間')
-            ->content(function ($record) {
-                if (!$record) {
-                    return '未指定時間';
-                }
-                return $record->starts_at->format('Y-m-d H:i') . ' - ' .
-                    $record->ends_at->format('H:i');
-            });
-    }
-
-    /**
-     * 預約類型選擇欄位
-     */
-    private function getAppointmentTypeField(): Forms\Components\Select
-    {
-        return Forms\Components\Select::make('appointment_type')
-            ->label('預約類型')
-            ->options([
-                'general' => '一般診療',
-                'specialist' => '專科診療',
-                'emergency' => '緊急診療',
-            ])
-            ->default(fn($record) => $record?->appointment_type)
-            ->disabled(fn($record) => $record?->status === 'booked')
-            ->required();
-    }
-
-    /**
-     * 診間輸入欄位
-     */
-    private function getLocationField(): Forms\Components\TextInput
-    {
-        return Forms\Components\TextInput::make('location')
-            ->label('診間')
-            ->default(fn($record) => $record?->location)
-            ->disabled(fn($record) => $record?->status === 'booked')
-            ->required();
-    }
-
-    /**
-     * 診間顯示欄位
-     */
-    private function getLocationPlaceholder(): Forms\Components\Placeholder
-    {
-        return Forms\Components\Placeholder::make('location')
-            ->label('診間')
-            ->content(fn($record) => $record ? $record->location : '未指定診間');
-    }
-
-    /**
-     * 病患備註輸入欄位
-     */
-    private function getPatientNotesField(): Forms\Components\Textarea
-    {
-        return Forms\Components\Textarea::make('patient_notes')
-            ->label('症狀描述')
-            ->visible(fn($record) => $record !== null)
-            ->required()
-            ->disabled(fn($record) => $record?->status === 'booked');
-    }
-
-    // 事件通知function
-    private function sendErrorNotification(string $title, string $body, $action): void
-    {
-        Notification::make()
-            ->title($title)
-            ->body($body)
-            ->danger()
-            ->send();
-        $action->halt();
-    }
-
-    // 简单通知，不需要action参数
-    private function sendSimpleNotification(string $title, string $body): void
-    {
-        Notification::make()
-            ->title($title)
-            ->body($body)
-            ->danger()
-            ->send();
-    }
-
-    // 檢查時間衝突
     private function hasTimeConflict($startsAt, $endsAt): bool
     {
         return Event::query()
             ->where(function ($query) use ($startsAt, $endsAt) {
-                // 使用单一查询检测所有冲突情况
+                // 使用單一查詢檢測所有衝突情況
                 $query->where(function ($q) use ($startsAt, $endsAt) {
                     $q->whereBetween('starts_at', [$startsAt, $endsAt])
                         ->orWhereBetween('ends_at', [$startsAt, $endsAt])
@@ -425,59 +475,8 @@ class CalendarWidget extends FullCalendarWidget
             })
             ->exists();
     }
-    /**
-     * 獲取指定時間範圍內的事件
-     */
-    private function getEventsInRange(string $startDate, string $endDate): \Illuminate\Database\Eloquent\Collection
-    {
-        return Event::query()
-            ->where('starts_at', '>=', $startDate)
-            ->where('ends_at', '<=', $endDate)
-            ->get();
-    }
 
-    /**
-     * 我的預約
-     * 已可預約
-     * 可預約
-     * 分別顯示不同顏色
-     */
-    private function formatEventTitle(Event $event, $user): string
-    {
-        if ($event->status === Event::STATUS_BOOKED) {
-            if ($event->patient_id === $user->id) {
-                return "我的預約：{$event->title}";
-            }
-
-            $patientName = $event->patient ? $event->patient->name : '未知病患';
-            return "已被預約：{$patientName} - 診療: {$event->title}";
-        }
-
-        if ($event->status === Event::STATUS_AVAILABLE) {
-            $doctorName = $event->doctor ? $event->doctor->name : '未知醫生';
-            return "可預約, 醫生: {$doctorName} - 診療: {$event->title}";
-        }
-
-        return $event->title;
-    }
-
-    /**
-     * 獲取事件顏色
-     */
-    private function getEventColor(Event $event, $user): string
-    {
-        if ($event->status === Event::STATUS_BOOKED) {
-            return ($event->patient_id === $user->id)
-                ? self::COLOR_BOOKED_SELF
-                : self::COLOR_BOOKED_OTHER;
-        }
-
-        if ($event->status === Event::STATUS_AVAILABLE) {
-            return self::COLOR_AVAILABLE;
-        }
-
-        return self::COLOR_AVAILABLE; // 默認顏色
-    }
+    // 業務邏輯與驗證
     /**
      * 創建預約時段並進行驗證
      */
@@ -502,22 +501,48 @@ class CalendarWidget extends FullCalendarWidget
 
         // 檢查起始時間是否大於結束時間
         if ($startsAt >= $endsAt) {
-            $this->sendErrorNotification('時間錯誤', '開始時間必須早於結束時間', $action);
+            $this->sendErrorNotification('時間錯誤', self::MSG_START_BEFORE_END, $action);
             return false;
         }
 
         // 檢查起始時間是否至少比現在晚一天
         if ($startsAt < now()->addDay()) {
-            $this->sendErrorNotification('時間錯誤', '開始時間必須至少比現在晚一天', $action);
+            $this->sendErrorNotification('時間錯誤', self::MSG_START_DAY_AFTER, $action);
             return false;
         }
 
         // 檢查時間重疊
         if ($this->hasTimeConflict($startsAt, $endsAt)) {
-            $this->sendErrorNotification('時間衝突', '此時段已有其他預約，請選擇其他時間', $action);
+            $this->sendErrorNotification('時間衝突', self::MSG_TIME_CONFLICT, $action);
             return false;
         }
 
         return true;
+    }
+
+    // 通知處理
+    /**
+     * 發送錯誤通知並中止動作
+     */
+    private function sendErrorNotification(string $title, string $body, $action): void
+    {
+        Notification::make()
+            ->title($title)
+            ->body($body)
+            ->danger()
+            ->send();
+        $action->halt();
+    }
+
+    /**
+     * 發送簡單通知，不中止動作
+     */
+    private function sendSimpleNotification(string $title, string $body): void
+    {
+        Notification::make()
+            ->title($title)
+            ->body($body)
+            ->danger()
+            ->send();
     }
 }

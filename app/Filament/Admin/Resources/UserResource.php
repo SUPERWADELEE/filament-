@@ -23,7 +23,12 @@ class UserResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required()
-                    ->maxLength(255),
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255)
+                    ->regex('/^[a-zA-Z0-9\s\p{Han}]+$/u')
+                    ->validationMessages([
+                        'regex' => '名稱只能包含中英文、數字和空格',
+                    ]),
                 Forms\Components\TextInput::make('email')
                     ->email()
                     ->required()

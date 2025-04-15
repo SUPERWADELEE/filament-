@@ -9,10 +9,18 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Panel;
 use Filament\Models\Contracts\FilamentUser;
 
+
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
+
+    protected $table = 'users';
+    protected $character = [
+        'doctor',
+        'patient',
+        'admin',
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -50,11 +58,10 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => 'string',
-            'is_approved' => 'boolean',
         ];
     }
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->role === 'doctor' || $this->role === 'patient';
+        return in_array($this->role, $this->character);
     }
 }
