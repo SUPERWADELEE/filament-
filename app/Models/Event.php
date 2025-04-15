@@ -52,17 +52,15 @@ class Event extends Model
         return $this->belongsTo(User::class, 'patient_id');
     }
 
-     // 檢查是否可以預約
-     public function isAvailable(): bool
-     {
-         return $this->status === 'available';
-     }
+    // 檢查是否可以預約
+    public function isAvailable(): bool
+    {
+        return $this->status === 'available';
+    }
 
-     // 檢查是否已被預約
-     public function isBooked(): bool
-     {
-         return $this->status === 'booked';
-     }
-
-
+    // 檢查是否已被預約
+    public function isBooked(): bool
+    {
+        return $this->status === 'booked';
+    }
 }

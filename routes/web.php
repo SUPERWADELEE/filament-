@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -20,7 +21,7 @@ Route::get('/check-auth', function () {
 });
 
 
-// 添加電子郵件路由
+// 添加電子郵件路由(如如果有需要
 Route::get('/email/verify/{id}/{token}', function ($id, $token) {
     $user = User::findOrFail($id);
 
@@ -39,6 +40,7 @@ Route::get('/email/verify/{id}/{token}', function ($id, $token) {
     return redirect()->route('filament.admin.auth.login')
         ->with('success', '電子郵件已驗證，請登入您的帳戶');
 })->name('verification.verify')->middleware('signed');
+
 // LINE相關路由
 Route::prefix('line')->group(function () {
     // 預約相關
@@ -54,7 +56,7 @@ Route::prefix('line')->group(function () {
     Route::post('/appointment/history/fetch', 'App\Http\Controllers\LineAppointmentController@fetchHistory')
         ->name('line.appointment.history.fetch');
 
-        
+
     // 登入相關
     Route::get('/login', 'App\Http\Controllers\LineLoginController@redirectToLine')
         ->name('line.login');

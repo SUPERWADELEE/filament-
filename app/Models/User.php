@@ -55,11 +55,6 @@ class User extends Authenticatable implements FilamentUser
     }
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->role === 'doctor';
-    }
-
-    public function posts()
-    {
-        return $this->hasMany(Post::class);
+        return $this->role === 'doctor' || $this->role === 'patient';
     }
 }

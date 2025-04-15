@@ -29,15 +29,11 @@ class UserResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
-                // Forms\Components\DateTimePicker::make('email_verified_at'),
-                // TODO 這種選項，看要不要從資料庫撈
                 Forms\Components\Select::make('role')
                     ->label('角色權限')
                     ->options([
                         'patient' => '患者',
                         'doctor' => '醫師',
-                        'receptionist' => '櫃檯人員',
-                        'admin' => '系統管理員',
                     ])
                     ->required(),
                 Forms\Components\TextInput::make('password')
@@ -83,16 +79,7 @@ class UserResource extends Resource
                     ->options([
                         'patient' => '患者',
                         'doctor' => '醫師',
-                        'receptionist' => '櫃檯人員',
-                        'admin' => '系統管理員',
                     ]),
-                Tables\Filters\SelectFilter::make('is_approved')
-                    ->options([
-                        '1' => '已審核',
-                        '0' => '未審核',
-                    ]),
-
-                //
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

@@ -19,6 +19,10 @@ use Saade\FilamentFullCalendar\FilamentFullCalendarPlugin;
 use App\Filament\Widgets\CalendarWidget;
 use App\Filament\Pages\Auth\Register;
 use App\Filament\Pages\Auth\Login;
+use Filament\Navigation\NavigationBuilder;
+use Filament\Navigation\NavigationItem;
+use Illuminate\Support\Facades\Auth;
+
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
@@ -45,6 +49,21 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 CalendarWidget::class,
             ])
+            ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+                return $builder
+                    ->item(
+                        NavigationItem::make('用戶管理')
+                            ->icon('heroicon-o-user-group')
+                            ->url(route('filament.admin.resources.users.index'))  // 修改這一行
+                            // 只有管理員可以看到
+                            ->visible(fn() => Auth::user()->role === 'doctor')
+                    )
+                    ->item(
+                        NavigationItem::make('預約管理')
+                            ->icon('heroicon-o-calendar')
+                            ->url(route('filament.admin.pages.calendar'))
+                    );
+            })
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
