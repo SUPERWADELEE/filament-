@@ -424,7 +424,7 @@ class CalendarWidget extends FullCalendarWidget
     /**
      * 創建編輯按鈕
      */
-    private function createEditAction($user, callable $callback = null): \Saade\FilamentFullCalendar\Actions\EditAction
+    private function createEditAction($user, ?callable $callback = null): \Saade\FilamentFullCalendar\Actions\EditAction
     {
         $action = \Saade\FilamentFullCalendar\Actions\EditAction::make()
             ->hidden(fn() => $this->isBookedOrOwnAppointment($user));

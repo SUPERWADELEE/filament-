@@ -34,6 +34,7 @@ class AppointmentReminderService
         // 查找即將到來的預約 (15分鐘內開始且未發送過提醒)
         $upcomingAppointments = $this->getIncomingEvents();
 
+        Log::info("即將到來的預約: " . $upcomingAppointments);
         $count = 0;
 
         foreach ($upcomingAppointments as $appointment) {
@@ -43,6 +44,7 @@ class AppointmentReminderService
                     // 發送提醒
                     $this->sendReminderToPatient($appointment);
 
+                    Log::info("發送提醒: " . $appointment);
                     // 標記提醒已發送
                     $appointment->reminder_sent_at = Carbon::now();
                     $appointment->save();
@@ -94,11 +96,15 @@ class AppointmentReminderService
      */
     protected function getIncomingEvents()
     {
-        return Event::where('status', 'booked')
+        Log::info("時間: " . Carbon::now());
+        $upcomingAppointments = Event::where('status', 'booked')
             ->where('starts_at', '>', Carbon::now())
             ->where('starts_at', '<=', Carbon::now()->addMinutes(15))
             ->whereNull('reminder_sent_at')
             ->with(['patient', 'doctor'])
             ->get();
+
+        Log::info("即將到來的預約: " . $upcomingAppointments);
+        return $upcomingAppointments;
     }
 }
