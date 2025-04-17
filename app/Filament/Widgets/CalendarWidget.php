@@ -51,7 +51,7 @@ class CalendarWidget extends FullCalendarWidget
     private const MSG_USE_CREATE_BUTTON = '請使用右上角的新增按鈕來創建預約時段';
     private const MSG_TIME_CONFLICT = '此時段已有其他預約，請選擇其他時間';
     private const MSG_START_BEFORE_END = '開始時間必須早於結束時間';
-    private const MSG_START_DAY_AFTER = '開始時間必須至少比現在晚一天';
+    private const MSG_START_DAY_AFTER = '開始時間必須至少比現在晚';
 
     // 其他常量
     private const DEBOUNCE_TIME_MS = 100;  // 防抖動時間間隔（毫秒）
@@ -342,7 +342,7 @@ class CalendarWidget extends FullCalendarWidget
                 ->label('新增')
                 ->icon('heroicon-o-plus')
                 ->color('success')
-                ->using(fn(array $data, $action) => $this->createAppointmentSlot($data, $action))
+                ->using(fn(array $data, $action) => $this->createAppointmentSlot($data, $action, $user))
         ];
     }
 
@@ -459,11 +459,10 @@ class CalendarWidget extends FullCalendarWidget
     /**
      * 檢查時間衝突
      */
-    private function hasTimeConflict($startsAt, $endsAt): bool
+    private function hasTimeConflict($startsAt, $endsAt, $user): bool
     {
         return Event::query()
             ->where(function ($query) use ($startsAt, $endsAt) {
-                // 使用單一查詢檢測所有衝突情況
                 $query->where(function ($q) use ($startsAt, $endsAt) {
                     $q->whereBetween('starts_at', [$startsAt, $endsAt])
                         ->orWhereBetween('ends_at', [$startsAt, $endsAt])
@@ -473,6 +472,7 @@ class CalendarWidget extends FullCalendarWidget
                         });
                 });
             })
+            ->where('doctor_id', $user->id)
             ->exists();
     }
 
@@ -480,10 +480,10 @@ class CalendarWidget extends FullCalendarWidget
     /**
      * 創建預約時段並進行驗證
      */
-    private function createAppointmentSlot(array $data, $action): ?Event
+    private function createAppointmentSlot(array $data, $action, $user): ?Event
     {
         // 執行所有驗證
-        if (!$this->validateAppointmentTimes($data, $action)) {
+        if (!$this->validateAppointmentTimes($data, $action, $user)) {
             return null;
         }
 
@@ -494,7 +494,7 @@ class CalendarWidget extends FullCalendarWidget
     /**
      * 驗證預約時間
      */
-    private function validateAppointmentTimes(array $data, $action): bool
+    private function validateAppointmentTimes(array $data, $action, $user): bool
     {
         $startsAt = $data['starts_at'];
         $endsAt = $data['ends_at'];
@@ -506,13 +506,13 @@ class CalendarWidget extends FullCalendarWidget
         }
 
         // 檢查起始時間是否至少比現在晚一天
-        if ($startsAt < now()->addDay()) {
+        if ($startsAt < now()) {
             $this->sendErrorNotification('時間錯誤', self::MSG_START_DAY_AFTER, $action);
             return false;
         }
 
         // 檢查時間重疊
-        if ($this->hasTimeConflict($startsAt, $endsAt)) {
+        if ($this->hasTimeConflict($startsAt, $endsAt, $user)) {
             $this->sendErrorNotification('時間衝突', self::MSG_TIME_CONFLICT, $action);
             return false;
         }
