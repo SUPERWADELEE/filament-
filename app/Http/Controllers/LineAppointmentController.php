@@ -59,7 +59,7 @@ class LineAppointmentController extends Controller
 
 
         // 檢查事件是否可用
-        $event = Event::findOrFail($validated['event_id']);
+        $event = Event::findOrFail($validated['event_id'])->lockForUpdate();
         if ($event->status !== 'available') {
             return response()->json([
                 'success' => false,
