@@ -96,7 +96,6 @@ class AppointmentReminderService
      */
     protected function getIncomingEvents()
     {
-        Log::info("時間: " . Carbon::now());
         $upcomingAppointments = Event::where('status', 'booked')
             ->where('starts_at', '>', Carbon::now())
             ->where('starts_at', '<=', Carbon::now()->addMinutes(15))
@@ -104,7 +103,6 @@ class AppointmentReminderService
             ->with(['patient', 'doctor'])
             ->get();
 
-        Log::info("即將到來的預約: " . $upcomingAppointments);
         return $upcomingAppointments;
     }
 }

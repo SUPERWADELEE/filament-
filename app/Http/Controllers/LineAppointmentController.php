@@ -109,35 +109,13 @@ class LineAppointmentController extends Controller
     /**
      * 顯示預約歷史頁面
      */
-    // 控制器
     public function getHistoryPage(Request $request)
     {
-        // 獲取用戶
-        $user = Auth::user() ?? User::where('line_user_id', $request->input('line_user_id'))->first();
-
-        if (!$user) {
-            return view('line.appointmentHistory', ['needLogin' => true]);
-        }
-
-        // 獲取預約並分類
-        $now = now();
-        $appointments = Event::where('patient_id', $user->id)
-            ->where('status', 'booked')
-            ->with('doctor')
-            ->get();
-
-        $upcomingAppointments = $appointments->filter(function ($appointment) use ($now) {
-            return $appointment->starts_at >= $now;
-        })->sortBy('starts_at');
-
-        $pastAppointments = $appointments->filter(function ($appointment) use ($now) {
-            return $appointment->starts_at < $now;
-        })->sortByDesc('starts_at');
-
-        return view('line.appointmentHistory', [
-            'upcomingAppointments' => $upcomingAppointments,
-            'pastAppointments' => $pastAppointments,
-            'needLogin' => false
+        // 使用Livewire版本的視圖
+        $lineUserId = $request->input('line_user_id');
+    
+        return view('line.appointment-history-livewire', [
+            'lineUserId' => $lineUserId
         ]);
     }
 
@@ -160,17 +138,30 @@ class LineAppointmentController extends Controller
             ]);
         }
 
-        // 獲取用戶的預約歷史
+        // 獲取當前時間
+        $now = now();
+
+        // 獲取用戶的所有預約
         $appointments = Event::where('patient_id', $user->id)
-            ->where('status', 'booked')
+            ->whereIn('status', ['booked', 'finished'])
             ->with('doctor')
-            ->orderBy('starts_at', 'desc')
             ->get();
 
+        // 根據開始時間分類為即將到來和歷史預約
+        $upcomingAppointments = $appointments->filter(function ($appointment) use ($now) {
+            return $appointment->status === 'booked' && $appointment->starts_at >= $now;
+        })->sortBy('starts_at')->values();
+
+        $pastAppointments = $appointments->filter(function ($appointment) use ($now) {
+            return $appointment->status === 'finished' || 
+                  ($appointment->status === 'booked' && $appointment->starts_at < $now);
+        })->sortByDesc('starts_at')->values();
 
         return response()->json([
             'success' => true,
             'appointments' => $appointments,
+            'upcomingAppointments' => $upcomingAppointments,
+            'pastAppointments' => $pastAppointments,
         ]);
     }
 }
