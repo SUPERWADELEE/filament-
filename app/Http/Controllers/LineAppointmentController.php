@@ -29,7 +29,7 @@ class LineAppointmentController extends Controller
             ->get();
 
         // 返回視圖，讓前端LIFF處理用戶認證
-        return view('line.appointment', [
+        return view('line.appointment-livewire', [
             'events' => $availableEvents
         ]);
     }
@@ -113,7 +113,7 @@ class LineAppointmentController extends Controller
     {
         // 使用Livewire版本的視圖
         $lineUserId = $request->input('line_user_id');
-    
+
         return view('line.appointment-history-livewire', [
             'lineUserId' => $lineUserId
         ]);
@@ -153,8 +153,8 @@ class LineAppointmentController extends Controller
         })->sortBy('starts_at')->values();
 
         $pastAppointments = $appointments->filter(function ($appointment) use ($now) {
-            return $appointment->status === 'finished' || 
-                  ($appointment->status === 'booked' && $appointment->starts_at < $now);
+            return $appointment->status === 'finished' ||
+                ($appointment->status === 'booked' && $appointment->starts_at < $now);
         })->sortByDesc('starts_at')->values();
 
         return response()->json([

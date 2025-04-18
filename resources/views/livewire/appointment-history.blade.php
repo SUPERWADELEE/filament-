@@ -1,3 +1,4 @@
+<div>
     {{-- 狀態提示區域 --}}
     @if($showLoginMessage)
     <x-line.alert type="warning" icon="exclamation-circle">
@@ -95,17 +96,4 @@
     </div>
     @endif
 
-    <div class="mt-8 flex justify-between">
-        <a href="{{ route('line.appointment') }}" class="block w-full mr-2 bg-blue-500 text-white font-medium py-3 px-4 rounded-lg hover:bg-blue-600 text-center">
-            <i class="fas fa-calendar-plus mr-2"></i>新增預約
-        </a>
-        <button id="closeButton" class="block w-full ml-2 bg-gray-500 text-white font-medium py-3 px-4 rounded-lg hover:bg-gray-600">
-            返回LINE
-        </button>
-    </div>
-
-    <div class="mt-8 text-center text-gray-500 text-sm">
-        <p>若有任何問題，請聯繫我們的客服</p>
-        <p class="mt-1">&copy; 2025 醫療預約系統</p>
-    </div>
-    </div>
+</div>

@@ -76,7 +76,7 @@
             <p class="text-gray-600">查看您的診療預約歷史</p>
         </div>
 
-        <livewire:appointment-history :lineUserId="$lineUserId" />
+        @livewire('appointment-history', ['lineUserId' => $lineUserId ?? null])
 
         <div class="mt-8 flex justify-between">
             <a href="{{ route('line.appointment') }}" class="block w-full mr-2 bg-blue-500 text-white font-medium py-3 px-4 rounded-lg hover:bg-blue-600 text-center">
@@ -97,7 +97,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // 設置關閉按鈕事件
-            document.getElementById('closeButton')?.addEventListener('click', function() {
+            document.getElementById('closeButton').addEventListener('click', function() {
                 if (window.liff) {
                     liff.closeWindow();
                 }
@@ -123,7 +123,7 @@
             }).then(() => {
                 handleLiffInitialized();
             }).catch(err => {
-                console.log('錯誤', err);
+                console.log('err', err);
             });
         }
 
@@ -143,7 +143,7 @@
                     Livewire.dispatch('lineUserProfileLoaded', [profile.userId]);
                 })
                 .catch(err => {
-                    console.log('錯誤', err);
+                    console.log('err', err);
 
                     // 如果是權限問題，嘗試重新登入
                     if (err.message.includes("permission") || err.message.includes("scope")) {
