@@ -14,6 +14,12 @@ use Illuminate\Support\Facades\Log;
 class AppointmentReminderService
 {
     protected MessagingApiApi $bot;
+    /**
+     * 通知時間（分鐘）
+     * 
+     * @var int
+     */
+    protected $notification_time = 15;
 
     public function __construct()
     {
@@ -98,7 +104,7 @@ class AppointmentReminderService
     {
         $upcomingAppointments = Event::where('status', 'booked')
             ->where('starts_at', '>', Carbon::now())
-            ->where('starts_at', '<=', Carbon::now()->addMinutes(15))
+            ->where('starts_at', '<=', Carbon::now()->addMinutes($this->notification_time))
             ->whereNull('reminder_sent_at')
             ->with(['patient', 'doctor'])
             ->get();

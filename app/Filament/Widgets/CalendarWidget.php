@@ -170,6 +170,7 @@ class CalendarWidget extends FullCalendarWidget
             $this->getDateTimeFields(),
             $this->getAppointmentTypeField(),
             $this->getLocationField(),
+            $this->getPatientNotesField(),
             Forms\Components\Hidden::make('doctor_id')->default($user->id),
             Forms\Components\Hidden::make('status')->default(self::STATUS_AVAILABLE),
         ];
