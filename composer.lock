@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7c673b8dd9897ffcb7c8b1ad03f34f06",
+    "content-hash": "e761f32d01fbdac2930b9a2c958f6a0a",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -1006,7 +1006,6 @@
                 "illuminate/database": "^10.45|^11.0|^12.0",
                 "illuminate/support": "^10.45|^11.0|^12.0",
                 "league/csv": "^9.16",
-                "openspout/openspout": "^4.23",
                 "php": "^8.1",
                 "spatie/laravel-package-tools": "^1.9"
             },
@@ -10346,7 +10345,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.2"
+        "php": "^8.3"
     },
     "platform-dev": [],
     "plugin-api-version": "2.3.0"
