@@ -1,10 +1,11 @@
-# 使用 PHP 8.2 FPM 為基底
-FROM php:8.2-fpm
+# 使用 PHP 8.3 FPM 為基底
+FROM php:8.3-fpm
 
 # 安裝必要擴充
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libzip-dev libpng-dev libonig-dev libxml2-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip gd
+    git curl zip unzip \
+    libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev libicu-dev \
+    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring zip gd intl
 
 # 安裝 Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
