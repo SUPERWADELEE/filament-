@@ -22,6 +22,6 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/filament- && \
-            git pull origin main && \
+            git pull && \
             docker exec laravel-app composer install --no-interaction --prefer-dist --optimize-autoloader && \
             docker exec laravel-app php artisan migrate --force
