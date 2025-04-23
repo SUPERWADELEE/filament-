@@ -51,10 +51,7 @@ services:
       - laravel
 
   n8n:
-    build:
-      context: ./n8n     
-      dockerfile: Dockerfile
-    image: custom-n8n
+    image: n8nio/n8n
     container_name: n8n
     ports:
       - "5678:5678"
@@ -63,8 +60,11 @@ services:
       - N8N_PROTOCOL=https
       - N8N_HOST=wadeleefilament.online
       - WEBHOOK_URL=https://wadeleefilament.online/n8n/
+      - VUE_APP_PUBLIC_PATH=/n8n/
+      - N8N_SECURE_COOKIE=true
     volumes:
       - ~/.n8n:/home/node/.n8n
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - laravel
     restart: unless-stopped

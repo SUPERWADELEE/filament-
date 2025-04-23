@@ -1,0 +1,27 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main  # 可依需求改為你部署用的 branch
+
+jobs:
+  deploy:
+    name: SSH Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Connect to EC2 and deploy
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/filament- && \
+            git pull origin main && \
+            docker exec laravel-app composer install --no-interaction --prefer-dist --optimize-autoloader && \
+            docker exec laravel-app php artisan migrate --force
