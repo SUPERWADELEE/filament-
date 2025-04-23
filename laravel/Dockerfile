@@ -1,3 +1,7 @@
+# 使用 Composer 安裝 Laravel 套件
+FROM composer:latest AS composer
+
+
 # 使用 PHP 8.3 FPM 為基底
 FROM php:8.3-fpm
 

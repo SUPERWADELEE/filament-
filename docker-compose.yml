@@ -4,7 +4,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile  # Laravel 的 Dockerfile
     image: laravel-app
     container_name: laravel-app
     working_dir: /var/www
@@ -43,24 +43,28 @@ services:
     volumes:
       - .:/var/www
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - /etc/letsencrypt:/etc/letsencrypt:ro 
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - app
+      - n8n
     networks:
       - laravel
 
   n8n:
-    image: n8nio/n8n
+    build:
+      context: ./n8n     
+      dockerfile: Dockerfile
+    image: custom-n8n
     container_name: n8n
     ports:
       - "5678:5678"
     environment:
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=admin123
-      - WEBHOOK_TUNNEL_URL=https://9c0c-43-207-121-216.ngrok-free.app:5678
+      - N8N_PATH=/n8n/
+      - N8N_PROTOCOL=https
+      - N8N_HOST=wadeleefilament.online
+      - WEBHOOK_URL=https://wadeleefilament.online/n8n/
     volumes:
       - ~/.n8n:/home/node/.n8n
-      - /home/ubuntu/filament-:/project
     networks:
       - laravel
     restart: unless-stopped
