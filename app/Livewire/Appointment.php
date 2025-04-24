@@ -46,6 +46,9 @@ class Appointment extends Component
 
     public function mount()
     {
+        // 設定默認時區為台灣時間
+        date_default_timezone_set('Asia/Taipei');
+        
         $this->loading = true;
         $this->loadAvailableEvents();
     }
@@ -91,10 +94,12 @@ class Appointment extends Component
     private function loadAvailableEvents()
     {
         try {
+            // 取得當前台灣時間
+            $now = Carbon::now('Asia/Taipei');
 
             // 從 Event 模型開始查詢可用時段，並關聯醫生資訊
             $availableEvents = Event::where('status', 'available')
-                ->where('starts_at', '>', now())
+                ->where('starts_at', '>', $now)
                 ->with('doctor') // 確保有定義 doctor 關聯
                 ->get();
 
@@ -207,21 +212,21 @@ class Appointment extends Component
     // 格式化日期
     public function formatDate($date)
     {
-        $carbonDate = Carbon::parse($date);
+        $carbonDate = Carbon::parse($date)->setTimezone('Asia/Taipei');
         return $carbonDate->format('Y/m/d');
     }
 
     // 獲取星期
     public function getDayOfWeek($date)
     {
-        $carbonDate = Carbon::parse($date);
+        $carbonDate = Carbon::parse($date)->setTimezone('Asia/Taipei');
         return '星期' . $this->weekdays[$carbonDate->dayOfWeek];
     }
 
     // 格式化時間
     public function formatTime($date)
     {
-        $carbonDate = Carbon::parse($date);
+        $carbonDate = Carbon::parse($date)->setTimezone('Asia/Taipei');
         return $carbonDate->format('H:i');
     }
 
