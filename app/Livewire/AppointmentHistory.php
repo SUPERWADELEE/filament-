@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
+use App\Http\Controllers\LineAppointmentController;
 
 class AppointmentHistory extends Component
 {
@@ -77,30 +79,45 @@ class AppointmentHistory extends Component
 
     // 獲取預約資料
     public function fetchAppointments()
-    {
-        $this->loading = true;
-        try {
-            $user = User::where('line_user_id', $this->lineUserId)->first();
-            if (!$user) {
-                $this->showLoginMessage = true;
-                $this->loading = false;
-                $this->dispatch('showNotification', ['message' => '找不到用戶資料', 'type' => 'warning']);
-                return;
-            }
-            $now = now();
-            // 將已訂閱且過期的更新為 finished
-            $this->updateAppointmentStatusToFinished($user, $now);
-            // 獲取所有預約
-            $appointments = $this->getAppointments($user);
-
-            // 分類預約
-            $this->categorizeAppointments($appointments, $now);
-
+{
+    $this->loading = true;
+    try {
+        if (!$this->lineUserId) {
+            $this->showLoginMessage = true;
             $this->loading = false;
-        } catch (\Exception $e) {
-            Log::error('AppointmentHistory fetchAppointments error', ['error' => $e->getMessage()]);
+            return;
         }
+        
+        // 創建請求對象
+        $request = new Request([
+            'line_user_id' => $this->lineUserId,
+        ]);
+        
+        // 調用控制器方法
+        $controller = new LineAppointmentController();
+        $response = $controller->getAppointmentsByLineUserId($request);
+        
+        // 解析響應
+        $data = json_decode($response->getContent(), true);
+        
+        if (isset($data['success']) && $data['success']) {
+            // 更新組件數據
+            $this->upcomingAppointments = $data['upcomingAppointments'];
+            $this->pastAppointments = $data['pastAppointments'];
+            $this->loading = false;
+        } else {
+            $this->showLoginMessage = true;
+            $this->loading = false;
+            $this->dispatch('showNotification', [
+                'message' => $data['message'] ?? '無法獲取預約資料',
+                'type' => 'warning'
+            ]);
+        }
+    } catch (\Exception $e) {
+        Log::error('AppointmentHistory fetchAppointments error', ['error' => $e->getMessage()]);
+        $this->handleError('載入預約記錄時發生錯誤');
     }
+}
 
     // 分類預約為即將到來和過去的
     protected function categorizeAppointments($appointments, $now)
@@ -179,3 +196,4 @@ class AppointmentHistory extends Component
             ->get();
     }
 }
+

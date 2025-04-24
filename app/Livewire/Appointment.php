@@ -3,8 +3,8 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use App\Models\Event;
 use App\Models\User;
+use App\Models\Event;
 use App\Http\Controllers\LineAppointmentController;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -91,37 +91,21 @@ class Appointment extends Component
     private function loadAvailableEvents()
     {
         try {
+            
             // 獲取所有可用的預約時段
-            $events = Event::where('status', 'available')
-                ->where('starts_at', '>', now())
-                ->with('doctor')
-                ->get();
-
-            // 將結果轉為陣列並儲存
-            $this->allEvents = $events->toArray();
-
+            $availableDoctors = User::whereHas('events', function ($query) {
+                $query->where('status', 'available')
+                    ->where('starts_at', '>', now());
+            })
+                ->where('role', 'doctor')
+                ->get()
+                ->toArray();
             // 如果沒有可用時段，設置提示訊息
-            if (empty($this->allEvents)) {
+            if (empty($availableDoctors)) {
                 $this->debugInfo = '目前沒有可用的預約時段，請稍後再試。';
                 return;
             }
-
-            // 提取唯一醫生列表（直接從查詢結果中提取）
-            $doctors = collect($this->allEvents)
-                ->filter(function ($event) {
-                    return isset($event['doctor']) && $event['status'] === 'available';
-                })
-                ->pluck('doctor')
-                ->unique('id')
-                ->values()
-                ->toArray();
-
-            $this->availableDoctors = $doctors;
-
-            // 如果沒有醫生，設置提示訊息
-            if (empty($this->availableDoctors)) {
-                $this->debugInfo = '目前沒有可用的醫生，請稍後再試。';
-            }
+            $this->availableDoctors = $availableDoctors;
         } catch (\Exception $e) {
             Log::error('載入預約時段錯誤: ' . $e->getMessage());
             $this->error = '載入可用時段失敗';
@@ -168,7 +152,7 @@ class Appointment extends Component
                 'display_name' => $displayName
             ]);
 
-            // 使用 Controller 方法
+            // 檢查或創建用戶 
             $controller = new LineAppointmentController();
             $controller->checkOrCreateUser($request);
         } catch (\Exception $e) {
@@ -192,29 +176,14 @@ class Appointment extends Component
 
         try {
             // 創建模擬請求對象
-            $request = new Request([
-                'event_id' => $this->selectedTimeSlotId,
-                'patient_name' => $this->patientName,
-                'patient_notes' => $this->patientNotes,
-                'line_user_id' => $this->lineUserId
-            ]);
-
-            // 使用 Controller 方法
-            $controller = new LineAppointmentController();
-            $response = $controller->book($request);
+            $response = $this->books();
 
             // 解析回應
             $data = json_decode($response->getContent(), true);
 
             if (isset($data['success']) && $data['success']) {
                 // 顯示成功訊息
-                $this->showSuccessCard = true;
-                $this->formSubmitting = false;
-                // 預約成功事件回傳
-                $this->dispatch('appointmentCreated', [
-                    'message' => $data['message'] ?? '預約成功',
-                    'eventId' => $data['event']['id'] ?? null
-                ]);
+                $this->appointmentSuccess($data);
             } else {
                 $this->addError('form', $data['message'] ?? '預約失敗，請稍後再試');
                 $this->formSubmitting = false;
@@ -250,5 +219,37 @@ class Appointment extends Component
     public function render()
     {
         return view('livewire.appointment');
+    }
+
+    public function books()
+    {
+        $request = new Request([
+            'event_id' => $this->selectedTimeSlotId,
+            'patient_name' => $this->patientName,
+            'patient_notes' => $this->patientNotes,
+            'line_user_id' => $this->lineUserId
+        ]);
+
+        // 使用 Controller 方法
+        $controller = new LineAppointmentController();
+        $response = $controller->book($request);
+        return $response;
+    }
+
+    // 預約成功事件回傳
+    public function appointmentSuccess($data)
+    {
+        $this->showSuccessCard = true;
+        $this->formSubmitting = false;
+        $this->dispatch('appointmentCreated', [
+            'message' => $data['message'] ?? '預約成功',
+            'eventId' => $data['event']['id'] ?? null,
+            'event' => $data['event'] ?? null,
+            'doctor' => $data['event']['doctor']['name'] ?? null, // 添加醫生名稱
+            'date' => $this->formatDate($data['event']['starts_at'] ?? null),
+            'time' => $this->formatTime($data['event']['starts_at'] ?? null),
+            'patientName' => $data['event']['patient_name'] ?? null,
+            'patientNotes' => $data['event']['patient_notes'] ?? null,
+        ]);
     }
 }

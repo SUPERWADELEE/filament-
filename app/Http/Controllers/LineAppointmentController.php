@@ -6,8 +6,6 @@ use App\Models\Event;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class LineAppointmentController extends Controller
@@ -20,7 +18,7 @@ class LineAppointmentController extends Controller
         }
     }
 
-    public function index(Request $request)
+    public function index()
     {
         // 總是先查詢可用事件，不管用戶是否登入
         $availableEvents = Event::where('status', 'available')
@@ -34,46 +32,27 @@ class LineAppointmentController extends Controller
         ]);
     }
 
+    // 訂閱事件
     public function book(Request $request)
     {
         $validated = $request->validate([
             'event_id' => 'required|exists:events,id',
             'patient_name' => 'required|string',
             'patient_notes' => 'nullable|string',
-            'line_user_id' => 'nullable|string' // 改為可選
+            'line_user_id' => 'required|string'
         ]);
 
         // 嘗試通過姓名查找用戶
         $user = User::where('line_user_id', $validated['line_user_id'])->first();
 
-        // 如果還是找不到用戶，創建一個新用戶
         if (!$user) {
-            $user = User::create([
-                'name' => $validated['patient_name'],
-                'email' => ($validated['line_user_id'] ?? Str::random(10)) . '@patient.local',
-                'password' => bcrypt(Str::random(16)),
-                'line_user_id' => $validated['line_user_id'] ?? null,
-                'role' => 'patient',
-            ]);
-        }
-
-
-        // 檢查事件是否可用
-        $event = Event::findOrFail($validated['event_id']);
-        if ($event->status !== 'available') {
             return response()->json([
                 'success' => false,
-                'message' => '此時段已被預約，請選擇其他時段'
+                'message' => '找不到用戶資料'
             ]);
         }
 
-        // 更新事件狀態
-        $event->update([
-            'status' => 'booked',
-            'patient_id' => $user->id,
-            'patient_notes' => $validated['patient_notes'],
-            'patient_name' => $validated['patient_name'],
-        ]);
+        $event = $this->checkAndUpdateAppointment($validated['event_id'], $validated['patient_notes'], $validated['patient_name'], $user->id);
 
         return response()->json([
             'success' => true,
@@ -82,6 +61,7 @@ class LineAppointmentController extends Controller
         ]);
     }
 
+    // 檢查或創建用戶，並返回用戶資料
     public function checkOrCreateUser(Request $request)
     {
         $validated = $request->validate([
@@ -155,6 +135,106 @@ class LineAppointmentController extends Controller
         $pastAppointments = $appointments->filter(function ($appointment) use ($now) {
             return $appointment->status === 'finished' ||
                 ($appointment->status === 'booked' && $appointment->starts_at < $now);
+        })->sortByDesc('starts_at')->values();
+
+        return response()->json([
+            'success' => true,
+            'appointments' => $appointments,
+            'upcomingAppointments' => $upcomingAppointments,
+            'pastAppointments' => $pastAppointments,
+        ]);
+    }
+
+    /**
+     * 檢查事件是否可用，完成事件
+     */
+    public function checkAndUpdateAppointment($event_id, $patient_notes, $patient_name, $user_id)
+    {
+        $event = Event::findOrFail($event_id);
+        if ($event->status !== 'available') {
+            return response()->json([
+                'success' => false,
+                'message' => '此時段已被預約，請選擇其他時段'
+            ]);
+        }
+
+        // 更新事件狀態
+        $event->update([
+            'status' => 'booked',
+            'patient_id' => $user_id,
+            'patient_notes' => $patient_notes,
+            'patient_name' => $patient_name,
+        ]);
+
+        return $event;
+    }
+
+    /**
+     * 更新預約狀態為完成
+     */
+    public function updateAppointmentStatusToFinished($userId)
+    {
+        $now = now();
+        // 自動將已過期但未標記為完成的預約更新為完成狀態
+        $expiredAppointmentsCount = Event::where('patient_id', $userId)
+            ->where('status', 'booked')
+            ->where('starts_at', '<', $now)
+            ->count();
+
+        if ($expiredAppointmentsCount > 0) {
+            Event::where('patient_id', $userId)
+                ->where('status', 'booked')
+                ->where('starts_at', '<', $now)
+                ->update(['status' => 'finished']);
+        }
+
+        return $expiredAppointmentsCount;
+    }
+
+    /**
+     * 獲取用戶所有預約
+     */
+    public function getUserAppointments($userId)
+    {
+        return Event::where('patient_id', $userId)
+            ->whereIn('status', ['booked', 'finished'])
+            ->with('doctor')
+            ->get();
+    }
+
+    /**
+     * 根據LINE用戶ID獲取所有預約並分類
+     */
+    public function getAppointmentsByLineUserId(Request $request)
+    {
+        $validated = $request->validate([
+            'line_user_id' => 'required|string',
+        ]);
+
+        $user = User::where('line_user_id', $validated['line_user_id'])->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => '找不到用戶資料'
+            ]);
+        }
+
+        $now = now();
+
+        // 更新狀態
+        $this->updateAppointmentStatusToFinished($user->id);
+
+        // 獲取預約
+        $appointments = $this->getUserAppointments($user->id);
+
+        // 分類預約
+        $upcomingAppointments = $appointments->filter(function ($appointment) use ($now) {
+            return $appointment->status === 'booked' && $appointment->starts_at >= $now;
+        })->sortBy('starts_at')->values();
+
+        $pastAppointments = $appointments->filter(function ($appointment) {
+            return $appointment->status === 'finished';
         })->sortByDesc('starts_at')->values();
 
         return response()->json([
