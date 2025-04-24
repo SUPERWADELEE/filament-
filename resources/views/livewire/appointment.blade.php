@@ -170,7 +170,8 @@
                         @foreach($availableTimeSlots as $slot)
                         <option value="{{ $slot['id'] }}">
                             {{ $this->formatDate($slot['starts_at']) }} ({{ $this->getDayOfWeek($slot['starts_at']) }})
-                            {{ $this->formatTime($slot['starts_at']) }} - {{ $this->formatTime($slot['ends_at']) }}
+                            {{ $this->formatTime($slot['starts_at']) }} - {{ $this->formatDate($slot['ends_at']) }} ({{ $this->getDayOfWeek($slot['ends_at']) }})
+                            {{ $this->formatTime($slot['ends_at']) }}
                         </option>
                         @endforeach
                     </select>
