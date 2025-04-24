@@ -11,12 +11,13 @@ class Event extends Model
 
     const STATUS_AVAILABLE = 'available';
     const STATUS_BOOKED = 'booked';
-
+    const STATUS_FINISHED = 'finished';
     const TITLE = [
         'DOCTOR_BOOKED' => '預約：',
         'PATIENT_AVAILABLE' => '可預約：',
         'PATIENT_MY_BOOKING' => '我的預約：',
         'PATIENT_BOOKED' => '已被預約：',
+        'PATIENT_FINISHED' => '已結束：',
     ];
     const ROLE = [
         'DOCTOR' => 'doctor',

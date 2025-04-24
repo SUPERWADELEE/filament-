@@ -26,7 +26,7 @@ class CalendarWidget extends FullCalendarWidget
     // 事件顏色常量
     private const COLOR_BOOKED = '#FF0000';   // 紅色 - 已被他人預約
     private const COLOR_AVAILABLE = '#4CAF50';      // 綠色 - 可預約時段
-
+    private const COLOR_FINISHED = '#000000';      // 黑色 - 已結束
     // 預約類型常量
     private const APPOINTMENT_TYPE_GENERAL = '一般診療';
     private const APPOINTMENT_TYPE_SPECIALIST = '專科診療';
@@ -35,7 +35,7 @@ class CalendarWidget extends FullCalendarWidget
     // 狀態常量
     private const STATUS_BOOKED = 'booked';
     private const STATUS_AVAILABLE = 'available';
-
+    private const STATUS_FINISHED = 'finished';
     // 標籤常量
     private const LABEL_DOCTOR = '醫生';
     private const LABEL_TREATMENT = '診療名稱';
@@ -112,6 +112,9 @@ class CalendarWidget extends FullCalendarWidget
             $patientName = $event->patient ? $event->patient->name : '未知病患';
             return "已被預約：{$patientName} - 診療: {$event->title}";
         }
+        if ($event->status === Event::STATUS_FINISHED) {
+            return "已結束：{$event->title}";
+        }
 
         if ($event->status === Event::STATUS_AVAILABLE) {
             $doctorName = $event->doctor ? $event->doctor->name : '未知醫生';
@@ -128,6 +131,10 @@ class CalendarWidget extends FullCalendarWidget
     {
         if ($event->status === Event::STATUS_BOOKED) {
             return self::COLOR_BOOKED;
+        }
+
+        if ($event->status === Event::STATUS_FINISHED) {
+            return self::COLOR_FINISHED;
         }
 
         if ($event->status === Event::STATUS_AVAILABLE) {
@@ -452,7 +459,7 @@ class CalendarWidget extends FullCalendarWidget
      */
     private function isBookedOrOwnAppointment($user): bool
     {
-        $isBooked = isset($this->record) && $this->record->status === self::STATUS_BOOKED;
+        $isBooked = isset($this->record) && $this->record->status === self::STATUS_BOOKED || $this->record->status === self::STATUS_FINISHED;
         // $isOwnAppointment = isset($this->record) && $this->record->patient_id === $user->id;
         return $isBooked;
     }
