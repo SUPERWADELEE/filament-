@@ -1,5 +1,4 @@
 <?php
-// app/Services/AppointmentReminderService.php
 
 namespace App\Services;
 
@@ -35,32 +34,31 @@ class AppointmentReminderService
      * 
      * @return int 發送的提醒數量
      */
-    public function sendReminders(): int
+    public function sendReminders()
     {
-        // 查找即將到來的預約 (15分鐘內開始且未發送過提醒)
         $upcomingAppointments = $this->getIncomingEvents();
-
-        Log::info("即將到來的預約: " . $upcomingAppointments);
         $count = 0;
+        $sentAppointmentIds = [];
 
+        // 對每個預約單獨處理，成功發送後立即標記
         foreach ($upcomingAppointments as $appointment) {
-            // 確保患者有關聯的LINE ID
             if ($appointment->patient && $appointment->patient->line_user_id) {
                 try {
                     // 發送提醒
                     $this->sendReminderToPatient($appointment);
-
-                    Log::info("發送提醒: " . $appointment);
-                    // 標記提醒已發送
-                    $appointment->reminder_sent_at = Carbon::now();
-                    $appointment->save();
-
+                    $sentAppointmentIds[] = $appointment->id;
                     $count++;
-                    Log::info("已發送預約提醒給患者ID: {$appointment->patient_id}, 預約ID: {$appointment->id}");
                 } catch (\Exception $e) {
-                    Log::error('發送LINE提醒失敗: ' . $e->getMessage());
+                    Log::error('發送LINE失敗: ' . $e->getMessage(), [
+                        'appointment_id' => $appointment->id,
+                        'patient_id' => $appointment->patient_id
+                    ]);
                 }
             }
+        }
+        // 批量更新
+        if (!empty($sentAppointmentIds)) {
+            Event::whereIn('id', $sentAppointmentIds)->update(['reminder_sent_at' => Carbon::now()]);
         }
 
         return $count;
@@ -75,15 +73,15 @@ class AppointmentReminderService
         $startTime = Carbon::parse($appointment->starts_at)->format('Y-m-d H:i');
         $doctorName = $appointment->doctor ? $appointment->doctor->name : '醫生';
 
-        $message = "您好！提醒您在 {$startTime}（約15分鐘後）有預約 {$doctorName} 的診療。";
+        $message = "您好！提醒您在 {$startTime}（約{$this->notification_time}分鐘後）有預約 {$doctorName} 的診療。";
         if ($appointment->location) {
             $message .= "診間位置：{$appointment->location}";
         }
 
-        // 創建LINE訊息
+        // 創建符合LINE規格訊息
         $textMessage = new TextMessage([
             'type' => 'text',
-            'text' => $message,
+            'text' => $message
         ]);
 
         // 發送訊息到LINE
@@ -110,5 +108,10 @@ class AppointmentReminderService
             ->get();
 
         return $upcomingAppointments;
+    }
+    public function setBot(MessagingApiApi $bot)
+    {
+        $this->bot = $bot;
+        return $this;
     }
 }
