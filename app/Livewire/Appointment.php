@@ -91,21 +91,34 @@ class Appointment extends Component
     private function loadAvailableEvents()
     {
         try {
-            
-            // 獲取所有可用的預約時段
-            $availableDoctors = User::whereHas('events', function ($query) {
-                $query->where('status', 'available')
-                    ->where('starts_at', '>', now());
-            })
-                ->where('role', 'doctor')
-                ->get()
+
+            // 從 Event 模型開始查詢可用時段，並關聯醫生資訊
+            $availableEvents = Event::where('status', 'available')
+                ->where('starts_at', '>', now())
+                ->with('doctor') // 確保有定義 doctor 關聯
+                ->get();
+
+            // 獲取可用醫生清單 (不重複)
+            $this->availableDoctors = $availableEvents
+                ->map(function ($event) {
+                    return [
+                        'id' => $event->doctor_id,
+                        'name' => $event->doctor->name ?? '未知醫師',
+                        // 其他你可能需要的醫生信息
+                    ];
+                })
+                ->unique('id')
+                ->values()
                 ->toArray();
+
+            // 保存原始的事件數據以供後續過濾使用
+            $this->allEvents = $availableEvents->toArray();
+
             // 如果沒有可用時段，設置提示訊息
-            if (empty($availableDoctors)) {
+            if (empty($this->allEvents)) {
                 $this->debugInfo = '目前沒有可用的預約時段，請稍後再試。';
                 return;
             }
-            $this->availableDoctors = $availableDoctors;
         } catch (\Exception $e) {
             Log::error('載入預約時段錯誤: ' . $e->getMessage());
             $this->error = '載入可用時段失敗';
