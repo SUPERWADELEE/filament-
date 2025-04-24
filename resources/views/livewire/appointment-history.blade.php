@@ -76,11 +76,7 @@
                     <h3 class="text-lg font-semibold text-gray-800">醫生：{{ isset($appointment['doctor']['name']) ? $appointment['doctor']['name'] : '未指定' }}</h3>
                     <div class="flex items-center mt-1">
                         <i class="far fa-calendar-alt text-blue-500 mr-2"></i>
-                        <span class="text-gray-600">{{ $this->formatDate($appointment['starts_at']) }} ({{ $this->getDayOfWeek($appointment['starts_at']) }}) - {{ $this->formatDate($appointment['ends_at']) }} ({{ $this->getDayOfWeek($appointment['ends_at']) }})</span>
-                    </div>
-                    <div class="flex items-center mt-1">
-                        <i class="far fa-clock text-blue-500 mr-2"></i>
-                        <span class="text-gray-600">{{ $this->formatTime($appointment['starts_at']) }} - {{ $this->formatTime($appointment['ends_at']) }}</span>
+                        <span class="text-gray-600">{{ $this->formatDate($appointment['starts_at']) }} ({{ $this->getDayOfWeek($appointment['starts_at']) }}) {{ $this->formatTime($appointment['starts_at']) }}   - {{ $this->formatDate($appointment['ends_at']) }} ({{ $this->getDayOfWeek($appointment['ends_at']) }}) {{ $this->formatTime($appointment['ends_at']) }}</span>
                     </div>
                 </div>
                 <div class="border-t border-gray-100 pt-3">
