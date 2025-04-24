@@ -45,14 +45,8 @@ class LineAppointmentController extends Controller
         // 嘗試通過姓名查找用戶
         $user = User::where('line_user_id', $validated['line_user_id'])->first();
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => '找不到用戶資料'
-            ]);
-        }
 
-        $event = $this->checkAndUpdateAppointment($validated['event_id'], $validated['patient_notes'], $validated['patient_name'], $user->id);
+        $event = $this->checkAndUpdateAppointment($validated['event_id'], $validated['patient_notes'], $validated['patient_name'], $user);
 
         return response()->json([
             'success' => true,
@@ -148,7 +142,7 @@ class LineAppointmentController extends Controller
     /**
      * 檢查事件是否可用，完成事件
      */
-    public function checkAndUpdateAppointment($event_id, $patient_notes, $patient_name, $user_id)
+    public function checkAndUpdateAppointment($event_id, $patient_notes, $patient_name, $user)
     {
         $event = Event::findOrFail($event_id);
         if ($event->status !== 'available') {
@@ -161,7 +155,7 @@ class LineAppointmentController extends Controller
         // 更新事件狀態
         $event->update([
             'status' => 'booked',
-            'patient_id' => $user_id,
+            'patient_id' => $user->id,
             'patient_notes' => $patient_notes,
             'patient_name' => $patient_name,
         ]);
