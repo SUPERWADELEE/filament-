@@ -45,8 +45,11 @@ class LineAppointmentController extends Controller
         // 嘗試通過姓名查找用戶
         $user = User::where('line_user_id', $validated['line_user_id'])->first();
 
+        if (!$user) {
+            $user = $this->checkOrCreateUser($validated['line_user_id'], $validated['patient_name']);
+        }
 
-        $event = $this->checkAndUpdateAppointment($validated['event_id'], $validated['patient_notes'], $validated['patient_name'], $user);
+        $event = $this->checkAndUpdateAppointment($validated['event_id'], $validated['patient_notes'], $validated['patient_name'], $user->id);
 
         return response()->json([
             'success' => true,
@@ -56,21 +59,17 @@ class LineAppointmentController extends Controller
     }
 
     // 檢查或創建用戶，並返回用戶資料
-    public function checkOrCreateUser(Request $request)
+    public function checkOrCreateUser($line_user_id, $patient_name)
     {
-        $validated = $request->validate([
-            'line_user_id' => 'required|string',
-            'display_name' => 'required|string'
-        ]);
 
-        $user = User::where('line_user_id', $validated['line_user_id'])->first();
+        $user = User::where('line_user_id', $line_user_id)->first();
 
         if (!$user) {
             $user = User::create([
-                'name' => $validated['display_name'],
-                'email' => ($validated['line_user_id'] ?? Str::random(10)) . '@patient.local',
+                'name' => $patient_name,
+                'email' => ($line_user_id ?? Str::random(10)) . '@patient.local',
                 'password' => bcrypt(Str::random(16)),
-                'line_user_id' => $validated['line_user_id'],
+                'line_user_id' => $line_user_id,
                 'role' => 'patient',
             ]);
         }
@@ -142,7 +141,7 @@ class LineAppointmentController extends Controller
     /**
      * 檢查事件是否可用，完成事件
      */
-    public function checkAndUpdateAppointment($event_id, $patient_notes, $patient_name, $user)
+    public function checkAndUpdateAppointment($event_id, $patient_notes, $patient_name, $user_id)
     {
         $event = Event::findOrFail($event_id);
         if ($event->status !== 'available') {
@@ -155,7 +154,7 @@ class LineAppointmentController extends Controller
         // 更新事件狀態
         $event->update([
             'status' => 'booked',
-            'patient_id' => $user->id,
+            'patient_id' => $user_id,
             'patient_notes' => $patient_notes,
             'patient_name' => $patient_name,
         ]);

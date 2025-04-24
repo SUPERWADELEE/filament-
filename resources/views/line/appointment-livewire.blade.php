@@ -728,7 +728,7 @@
                     // 獲取LINE資料
                     const profile = await liff.getProfile();
 
-                    Livewire.dispatch('lineUserProfileLoaded', [profile.userId]);
+                    Livewire.dispatch('lineUserProfileLoaded', [profile.userId, profile.displayName]);
                 } else {
                     // LINE未登入，無法獲取用戶資料，需要先登入LINE
                     Livewire.dispatch('lineLoginRequired');

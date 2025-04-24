@@ -51,11 +51,11 @@ class Appointment extends Component
     }
 
     // 當 LINE 用戶資料載入時
-    public function lineUserProfileLoaded($data = null)
+    public function lineUserProfileLoaded($lineUserId = null, $displayName = null)
     {
         try {
-            $this->lineUserId = $data;
-
+            $this->lineUserId = $lineUserId;
+            $this->displayName = $displayName;
             if ($this->lineUserId && is_string($this->lineUserId)) {
                 // 使用 Controller 方法
                 $this->checkOrCreateUser($this->lineUserId, $this->displayName);
@@ -159,15 +159,11 @@ class Appointment extends Component
                 return null;
             }
 
-            // 創建模擬請求對象
-            $request = new Request([
-                'line_user_id' => $lineUserId,
-                'display_name' => $displayName
-            ]);
 
             // 檢查或創建用戶 
             $controller = new LineAppointmentController();
-            $controller->checkOrCreateUser($request);
+            $user = $controller->checkOrCreateUser($lineUserId, $displayName);
+            return $user;
         } catch (\Exception $e) {
             Log::error('檢查或創建用戶錯誤: ' . $e->getMessage());
             return null;

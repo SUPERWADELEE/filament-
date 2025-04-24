@@ -108,10 +108,6 @@ class AppointmentHistory extends Component
         } else {
             $this->showLoginMessage = true;
             $this->loading = false;
-            $this->dispatch('showNotification', [
-                'message' => $data['message'] ?? '無法獲取預約資料',
-                'type' => 'warning'
-            ]);
         }
     } catch (\Exception $e) {
         Log::error('AppointmentHistory fetchAppointments error', ['error' => $e->getMessage()]);
