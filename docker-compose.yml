@@ -49,7 +49,6 @@ services:
       - n8n
     networks:
       - laravel
-
   n8n:
     image: n8nio/n8n
     container_name: n8n
